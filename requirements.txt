@@ -1,0 +1,11 @@
+streamlit 
+pytesseract 
+opencv-python 
+pdf2image 
+pillow
+easyocr
+google.generativeai
+pandas
+python-dotenv
+numpy
+PyMuPDF
