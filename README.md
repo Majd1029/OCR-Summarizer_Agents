@@ -28,7 +28,7 @@ This project provides a modular OCR (Optical Character Recognition) pipeline tha
 
 1. **Clone the repository** (if not already):
    ```bash
-   git clone <repo-url>
+   git clone https://github.com/Majd1029/ocr_pipeline 
    cd ocr_pipeline-main
 2. **Create a virtual environment** (recommended):
     ```bash
