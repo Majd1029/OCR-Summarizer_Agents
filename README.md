@@ -3,19 +3,18 @@
 This project provides a modular OCR (Optical Character Recognition) pipeline that supports multiple OCR engines, including Gemini and openAI APIs. Also including Tesseract, EasyOCR, and PaddleOCR. It can be used to extract text from scanned documents, images, and PDFs with options to switch between engines based on use-case requirements.
 
 ## 📁 Project Structure
-
-ocr_pipeline-main/
-├── app.py # Main app interface
-├── app_gemini.py # Alternative app version (possibly using Gemini API or LLM integration)
-├── main_tesseract.py # Tesseract OCR implementation
-├── main_easy.py # EasyOCR implementation
-├── main_paddle.py # PaddleOCR implementation
-├── Sample_book.pdf # Sample PDF for OCR
-├── sample_qcm (1).jpg # Sample image for OCR
-├── requirements.txt # Python dependencies
-├── Rapport of the Part 1.txt # Possibly documentation or a report
-└── .gitignore
-
+    - ```bash    
+    ocr_pipeline-main/
+    ├── app.py # Main app interface
+    ├── app_gemini.py # Alternative app version (possibly using Gemini API or LLM integration)
+    ├── main_tesseract.py # Tesseract OCR implementation
+    ├── main_easy.py # EasyOCR implementation
+    ├── main_paddle.py # PaddleOCR implementation
+    ├── Sample_book.pdf # Sample PDF for OCR
+    ├── sample_qcm (1).jpg # Sample image for OCR
+    ├── requirements.txt # Python dependencies
+    ├── Rapport of the Part 1.txt # Possibly documentation or a report
+    └── .gitignore
 
 ## 🚀 Features
 
