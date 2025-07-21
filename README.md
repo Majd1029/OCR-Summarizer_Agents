@@ -45,12 +45,9 @@ This project provides a modular OCR (Optical Character Recognition) pipeline tha
 - **PaddleOCR**:
     ```bash
     pip install paddleocr
-
 - **EasyOCR**:
     ```bash
     pip install easyocr
-
-
 ## 📄 Usage
 
 - Each OCR engine has its own script. You can run them like:
