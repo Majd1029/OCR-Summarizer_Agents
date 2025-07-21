@@ -41,13 +41,12 @@ This project provides a modular OCR (Optical Character Recognition) pipeline tha
 
 4. **Install OCR Engine Requirements**:
 
-Tesseract: Install from here.
 
-PaddleOCR:
+- **PaddleOCR**:
     ```bash
     pip install paddleocr
 
-EasyOCR:
+- **EasyOCR**:
     ```bash
     pip install easyocr
 
