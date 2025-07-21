@@ -152,6 +152,37 @@ def convert_pdf_to_images(pdf_path, start, end):
         saved_images.append(image_path)
     return saved_images
 
+def clean_markdown_table(table_md: str) -> str:
+    lines = [line.strip() for line in table_md.strip().split("\n") if line.strip()]
+    
+    # Skip cleaning if table has fewer than 3 lines (header, separator, at least one row)
+    if len(lines) < 3:
+        return table_md
+
+    # Count columns from header
+    header = lines[0]
+    num_cols = header.count('|') - 1  # because line starts and ends with '|'
+
+    cleaned_lines = [header]
+    cleaned_lines.append("|" + "|".join(['---'] * num_cols) + "|")  # enforce separator line
+
+    for line in lines[2:]:
+        cells = [cell.strip() for cell in line.strip('|').split('|')]
+        
+        # Normalize row length
+        if len(cells) < num_cols:
+            cells.extend([''] * (num_cols - len(cells)))
+        elif len(cells) > num_cols:
+            cells = cells[:num_cols]  # truncate extra cells
+
+        # Escape hash (#) symbols unless they're intended for headers
+        cells = [re.sub(r"^#", "No.", cell) for cell in cells]
+        
+        cleaned_lines.append("| " + " | ".join(cells) + " |")
+
+    return "\n".join(cleaned_lines)
+
+
 def display_markdown_with_tables(md_text):
     table_blocks = re.findall(r"((?:\|.+\|\n)+)", md_text)
     parts = re.split(r"(?:\|.+\|\n)+", md_text)
@@ -161,6 +192,7 @@ def display_markdown_with_tables(md_text):
         if i < len(table_blocks):
             table_md = table_blocks[i].strip()
             try:
+                fixed_table_md = clean_markdown_table(table_md)
                 df = pd.read_csv(StringIO(table_md), sep="|", engine="python")
                 df = df.dropna(axis=1, how="all")
                 df.columns = df.columns.str.strip()
@@ -168,7 +200,7 @@ def display_markdown_with_tables(md_text):
                 st.table(df)
             except Exception:
                 st.markdown("⚠️ Failed to render table properly.")
-                st.code(table_md)
+                st.code(fixed_table_md)
 
 # Streamlit UI
 st.title("📖 Advanced OCR Extractor")
