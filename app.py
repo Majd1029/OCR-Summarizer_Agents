@@ -269,6 +269,9 @@ if uploaded_file:
                 text = extract_text(img_path)
                 st.session_state.markdown_results = text.strip() if text and text.strip() else "*No text found in the image.*"
 
+SAVED_MD_FOLDER = "saved_markdown"
+os.makedirs(SAVED_MD_FOLDER, exist_ok=True)
+
 # Display and download
 if st.session_state.markdown_results:
     st.subheader("📄 Extracted Content")
@@ -278,12 +281,21 @@ if st.session_state.markdown_results:
     suffix = f"_({start_page}-{end_page})" if file_ext == "pdf" else ""
     download_name = f"Extracted_{filename}{suffix}.md"
 
+    # ✅ SAVE TO FILE LOCALLY
+    full_save_path = os.path.join(SAVED_MD_FOLDER, download_name)
+    with open(full_save_path, "w", encoding="utf-8") as f:
+        f.write(st.session_state.markdown_results)
+
+    st.success(f"✅ Markdown file saved: `{full_save_path}`")
+
+    # ✅ DOWNLOAD BUTTON
     st.download_button(
         label="📥 Download Extracted Markdown",
         data=st.session_state.markdown_results,
         file_name=download_name,
         mime="text/markdown"
     )
+
 
 if st.button("🧹 Clear Extracted Content"):
     st.session_state.markdown_results = ""
