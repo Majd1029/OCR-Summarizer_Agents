@@ -79,15 +79,26 @@ def extract_text_openai(image_path):
                     {
                         "type": "text",
                         "text": (
-                            "This image is a scanned page from an official school textbook. It may contain exercises, lessons, poetry, diagrams, or mixed content.\n\n"
+                            "This image may contain educational or non-educational content, including text, diagrams, or mixed elements. Your role is not to judge the relevance or origin of the content, but to extract **all visible text** exactly as it appears.\n\n"
+
+                            "⚠️ Never refuse to process the image. If there is any readable text at all, **extract it**. If you cannot read it, use `[Unreadable text]` as a placeholder.\n\n"
+                            
                             "You are capable of understanding Arabic, French, and English, and can process various input types such as scanned documents, textbook images, phone photos, PDFs, or handwritten materials.\n\n"
 
                             "### Your Task:\n"
                             "- Extract the text **exactly as it appears in the original document**, without translating, paraphrasing, or completing missing parts.\n"
                             "- If a part is unreadable, write: `[Unreadable text]`\n\n"
 
+                            "## OCR Extraction Rules:\n"
+                            "- Do **not** judge the source, quality, or relevance of the image.\n"
+                            "- Do **not** comment on whether it is from a textbook or not.\n"
+                            "- Do **not** refuse the task for any reason unless the image is entirely blank or unreadable.\n"
+                            "- Focus only on accurate **text extraction** with correct formatting.\n\n"
+
                             "### Preserve:\n"
-                            "- **Text direction**: Arabic must remain in RTL.\n"
+                            "- Text direction (Arabic = RTL, English/French = LTR)\n"
+                            "- Alignment using: `<div align='right'>`, `<div align='center'>`, etc.\n"
+                            "- Markdown structure for headers, exercises, blockquotes, and tables\n\n"
                             "- **Line spacing and indentation**\n"
                             "- **Text alignment**:\n"
                             "  - `<div align='center'> ... </div>` for centered\n"
@@ -117,7 +128,7 @@ def extract_text_openai(image_path):
                             "- No extra commentary or explanation\n\n"
 
                             "### Output:\n"
-                            "Only output clean Markdown text with proper structure and alignment. Use HTML `<div>` only for text alignment when needed."
+                            "Only clean Markdown text, no commentary or explanations. If unsure, still attempt extraction and structure."
                         )
                     },
                     {
@@ -186,21 +197,33 @@ def clean_markdown_table(table_md: str) -> str:
 def display_markdown_with_tables(md_text):
     table_blocks = re.findall(r"((?:\|.+\|\n)+)", md_text)
     parts = re.split(r"(?:\|.+\|\n)+", md_text)
+
     for i, part in enumerate(parts):
         if part.strip():
             st.markdown(part.strip())
+
         if i < len(table_blocks):
             table_md = table_blocks[i].strip()
             try:
                 fixed_table_md = clean_markdown_table(table_md)
-                df = pd.read_csv(StringIO(table_md), sep="|", engine="python")
+                df = pd.read_csv(StringIO(fixed_table_md), sep="|", engine="python", skipinitialspace=True)
+
+                # Remove unnamed empty columns caused by outer pipes
+                df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
                 df = df.dropna(axis=1, how="all")
+
+                # Drop separator row if exists (---)
+                if df.shape[0] > 0 and df.iloc[0].astype(str).str.contains("---").all():
+                    df = df.drop(index=0)
+
+                # Strip whitespace from headers
                 df.columns = df.columns.str.strip()
-                df = df.drop(index=0) if all(df.iloc[0].str.contains("---")) else df
+
                 st.table(df)
-            except Exception:
-                st.markdown("⚠️ Failed to render table properly.")
+            except Exception as e:
+                st.markdown("⚠️ Failed to render table properly. Showing as raw Markdown:")
                 st.code(fixed_table_md)
+
 
 # Streamlit UI
 st.title("📖 Advanced OCR Extractor")
