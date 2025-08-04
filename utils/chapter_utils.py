@@ -1,7 +1,7 @@
 import os
 import langdetect
 import google.generativeai as genai
-import openai
+from openai import OpenAI
 
 SUMMARY_PROMPT_TEMPLATE = """
 You are an expert AI trained in summarizing academic and educational documents.
@@ -34,7 +34,8 @@ def summarize_chapter(markdown_text: str, chapter_name: str = "summary", model_c
             response = model.generate_content(prompt)
             summary_text = response.text.strip() if response and response.text else "*No summary generated.*"
         else:  # OpenAI
-            completion = openai.ChatCompletion.create(
+            client = OpenAI()
+            response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {"role": "system", "content": "You are an expert AI trained in summarizing academic and educational documents."},
@@ -42,7 +43,7 @@ def summarize_chapter(markdown_text: str, chapter_name: str = "summary", model_c
                 ],
                 max_tokens=2048
             )
-            summary_text = completion.choices[0].message.content.strip() if completion.choices else "*No summary generated.*"
+            summary_text = response.choices[0].message.content.strip()
 
         # Save to .md file
         safe_filename = "".join(c for c in chapter_name if c.isalnum() or c in (' ', '_', '-')).rstrip()
