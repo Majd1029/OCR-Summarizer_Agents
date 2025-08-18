@@ -25,7 +25,7 @@ def summarize_chapter(markdown_text: str, chapter_name: str = "summary", model_c
         try:
             lang = langdetect.detect(markdown_text)
         except:
-            lang = "en"
+            lang = "ar"  # Default to Arabic if detection fails
 
         prompt = f"{SUMMARY_PROMPT_TEMPLATE.strip()}\n\nLanguage: {lang}\n\nChapter Content:\n\n{markdown_text}"
 
@@ -41,7 +41,7 @@ def summarize_chapter(markdown_text: str, chapter_name: str = "summary", model_c
                     {"role": "system", "content": "You are an expert AI trained in summarizing academic and educational documents."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=2048
+                max_tokens=4000
             )
             summary_text = response.choices[0].message.content.strip()
 
