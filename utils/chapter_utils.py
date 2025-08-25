@@ -12,10 +12,12 @@ Your task is to read and summarize the provided Markdown chapter content into a 
 - Use the **same language** as the original text.
 - Create a **longer summary with multiple paragraphs**.
 - Explain key points, important definitions, and concepts.
+- **Identify, accurately reproduce, and clearly explain every theorem and mathematical formula. Do not omit or paraphrase formulas or theorems; preserve their original notation (including LaTeX if present).**
+- For each theorem or formula, provide a brief explanation of its meaning and significance.
 - Maintain logical flow and structure.
 - Do **not** include headings or page numbers.
 - Do **not** bullet or number anything; use paragraph form.
-- Make the result easy to study from.
+- Make the result easy to study from and faithful to the original content.
 
 Only return clean, properly spaced, multi-paragraph **Markdown-formatted** text.
 """
