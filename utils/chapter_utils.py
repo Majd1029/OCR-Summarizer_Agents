@@ -2,6 +2,7 @@ import os
 import langdetect
 import google.generativeai as genai
 from openai import OpenAI
+import re
 
 SUMMARY_PROMPT_TEMPLATE = """
 You are an expert AI trained in summarizing academic and educational documents.
@@ -22,7 +23,37 @@ Your task is to read and summarize the provided Markdown chapter content into a 
 Only return clean, properly spaced, multi-paragraph **Markdown-formatted** text.
 """
 
-def summarize_chapter(markdown_text: str, chapter_name: str = "summary", model_choice: str = "Gemini") -> tuple[str, str]:
+def split_markdown_into_chapters(markdown_text: str):
+    """
+    Splits markdown text into chapters based on headings (## or #).
+    Returns a list of (chapter_title, chapter_body) tuples.
+    Duplicate chapter titles are allowed and preserved by index.
+    """
+    chapters = re.split(r'(?m)^#{1,2} (.+)$', markdown_text)
+    chapter_titles = []
+    chapter_bodies = []
+    if len(chapters) > 1:
+        for i in range(1, len(chapters), 2):
+            chapter_title = chapters[i].strip()
+            chapter_body = chapters[i+1].strip()
+            chapter_titles.append(chapter_title)
+            chapter_bodies.append(chapter_body)
+    else:
+        # No headings found, treat as single chapter
+        chapter_titles = ["Full Document"]
+        chapter_bodies = [markdown_text]
+    # Return with index to preserve duplicates
+    return [(f"{title}", body) for title, body in zip(chapter_titles, chapter_bodies)]
+
+def summarize_chapter(
+    markdown_text: str,
+    output_filename: str = "summary",
+    model_choice: str = "Gemini"
+) -> tuple[str, str]:
+    """
+    Summarizes the given markdown_text and saves it to the specified output_filename.
+    Returns (summary_text, output_path).
+    """
     try:
         try:
             lang = langdetect.detect(markdown_text)
@@ -40,18 +71,24 @@ def summarize_chapter(markdown_text: str, chapter_name: str = "summary", model_c
             response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": "You are an expert AI trained in summarizing academic and educational documents."},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": SUMMARY_PROMPT_TEMPLATE.strip()},
+                    {"role": "user", "content": f"Language: {lang}\n\nChapter Content:\n\n{markdown_text}"}
                 ],
                 max_tokens=4000
             )
             summary_text = response.choices[0].message.content.strip()
 
-        # Save to .md file
-        safe_filename = "".join(c for c in chapter_name if c.isalnum() or c in (' ', '_', '-')).rstrip()
+        # Ensure output_filename is unique if needed (for duplicate chapter names)
         output_folder = os.path.join("outputs", "summaries")
         os.makedirs(output_folder, exist_ok=True)
-        output_path = os.path.join(output_folder, f"{safe_filename}_summary.md")
+        safe_filename = "".join(c for c in output_filename if c.isalnum() or c in (' ', '_', '-')).rstrip()
+        base_path = os.path.join(output_folder, f"{safe_filename}.md")
+        output_path = base_path
+        count = 1
+        while os.path.exists(output_path):
+            output_path = os.path.join(output_folder, f"{safe_filename}_{count}.md")
+            count += 1
+
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(summary_text)
 
