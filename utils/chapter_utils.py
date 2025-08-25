@@ -96,3 +96,12 @@ def summarize_chapter(
 
     except Exception as e:
         return f"⚠️ Error during summarization: {e}", None
+
+def is_effectively_empty_chapter(text):
+    stripped = text.strip()
+    if not stripped:
+        return True
+    page_marker_pattern = r"^### Page: .+\n```markdown\n*\s*```$"
+    if re.match(page_marker_pattern, stripped, re.MULTILINE):
+        return True
+    return False
