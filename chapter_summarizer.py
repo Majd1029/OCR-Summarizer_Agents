@@ -62,7 +62,11 @@ if uploaded_md:
                     if chapter in selected_chapters:
                         chapter_body = chapter_bodies[idx]
                         output_name = output_names[(chapter, idx)]
-                        summary, summary_path = summarize_chapter(chapter_body, output_name, model_choice)
+                        if not chapter_body.strip():
+                            summary = ""
+                            summary_path = None
+                        else:
+                            summary, summary_path = summarize_chapter(chapter_body, output_name, model_choice)
                         st.subheader(f"📘 Summary for: {chapter}")
                         st.markdown(summary)
                         if summary_path and os.path.exists(summary_path):
@@ -74,6 +78,8 @@ if uploaded_md:
                                     mime="text/markdown",
                                     key=f"dl_{chapter}_{idx}"
                                 )
+                        elif not chapter_body.strip():
+                            st.info("This chapter is empty.")
                         else:
                             st.error(f"Summary file for '{chapter}' could not be generated or found.")
     else:  # All Together
