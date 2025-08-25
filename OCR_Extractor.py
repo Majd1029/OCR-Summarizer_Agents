@@ -49,8 +49,15 @@ OCR_PROMPT = (
     "5. For multi-column layouts or side-by-side text blocks, reconstruct layout using borderless HTML `<table>` tags.\n"
     "6. Ignore all non-textual elements such as bindings, stains, or background marks.\n"
     "7. For any unreadable text, use the placeholder `[Unreadable]`.\n"
-    "8. Do NOT add any explanations, inferred answers, or translations.\n"
-    "9. Output **only Markdown**, no HTML outside the specified use cases, and no additional commentary.\n"
+    "8. **Mathematical formulas must be preserved exactly as they appear.**\n"
+    "   - Inline formulas: wrap with single dollar signs `$...$`.\n"
+    "   - Display formulas: wrap with double dollar signs `$$...$$` on separate lines.\n"
+    "   - If LaTeX is present, preserve it as-is.\n"
+    "9. **Clearly identify and preserve all theorems, lemmas, corollaries, proofs, and definitions.**\n"
+    "   - Mark theorem-like statements in bold (e.g., `**Theorem 1:**`).\n"
+    "   - Do not paraphrase or omit any part of a theorem or formula.\n"
+    "10. Do NOT add any explanations, inferred answers, or translations.\n"
+    "11. Output **only Markdown**, no HTML outside the specified use cases, and no additional commentary.\n"
 )
 
 def upload_to_gemini(image_path):

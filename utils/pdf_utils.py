@@ -55,3 +55,32 @@ def display_markdown_with_tables(md_text):
             except Exception as e:
                 st.markdown("⚠️ Failed to render table properly. Showing as raw Markdown:")
                 st.code(fixed_table_md)
+
+def highlight_formulas_and_theorems(md_text: str) -> str:
+    """
+    Ensures that mathematical formulas and theorem-like blocks are preserved in Markdown.
+    - Wraps detected formulas in `$...$` or `$$...$$` if not already.
+    - Highlights theorem-like blocks.
+    """
+    # Preserve inline math: e.g., x^2 + y^2 = z^2
+    md_text = re.sub(
+        r'(?<!\$)(\b[a-zA-Z0-9_]+\s*=\s*[^.,;\n]+)(?!\$)',
+        r'$\1$',
+        md_text
+    )
+
+    # Preserve display math: lines starting and ending with math symbols
+    md_text = re.sub(
+        r'(?<!\$)\n([ \t]*[\\\(\[].+[\\\)\]])\n(?!\$)',
+        r'\n$$\1$$\n',
+        md_text
+    )
+
+    # Highlight theorem-like blocks
+    theorem_patterns = [
+        r'(Theorem\s*\d*\.?.*?:)', r'(Lemma\s*\d*\.?.*?:)', r'(Corollary\s*\d*\.?.*?:)', r'(Proof\s*:)', r'(Definition\s*:)', r'(Proposition\s*:)', r'(Remark\s*:)'
+    ]
+    for pattern in theorem_patterns:
+        md_text = re.sub(pattern, r'**\1**', md_text, flags=re.IGNORECASE)
+
+    return md_text
