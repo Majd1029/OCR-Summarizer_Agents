@@ -1,9 +1,13 @@
 import os
+import re
 import langdetect
 import google.generativeai as genai
 from openai import OpenAI
-import re
 
+
+# =========================
+# 📌 Prompt Template
+# =========================
 SUMMARY_PROMPT_TEMPLATE = """
 You are an expert AI trained in summarizing academic and educational documents.
 
@@ -13,7 +17,8 @@ Your task is to read and summarize the provided Markdown chapter content into a 
 - Use the **same language** as the original text.
 - Create a **longer summary with multiple paragraphs**.
 - Explain key points, important definitions, and concepts.
-- **Identify, accurately reproduce, and clearly explain every theorem and mathematical formula. Do not omit or paraphrase formulas or theorems; preserve their original notation (including LaTeX if present).**
+- **Identify, accurately reproduce, and clearly explain every theorem and mathematical formula. 
+  Do not omit or paraphrase formulas or theorems; preserve their original notation (including LaTeX if present).**
 - For each theorem or formula, provide a brief explanation of its meaning and significance.
 - Maintain logical flow and structure.
 - Do **not** include headings or page numbers.
@@ -23,49 +28,69 @@ Your task is to read and summarize the provided Markdown chapter content into a 
 Only return clean, properly spaced, multi-paragraph **Markdown-formatted** text.
 """
 
-def split_markdown_into_chapters(markdown_text: str):
-    """
-    Splits markdown text into chapters based on headings (## or #).
-    Returns a list of (chapter_title, chapter_body) tuples.
-    Duplicate chapter titles are allowed and preserved by index.
-    """
-    chapters = re.split(r'(?m)^#{1,2} (.+)$', markdown_text)
-    chapter_titles = []
-    chapter_bodies = []
-    if len(chapters) > 1:
-        for i in range(1, len(chapters), 2):
-            chapter_title = chapters[i].strip()
-            chapter_body = chapters[i+1].strip()
-            chapter_titles.append(chapter_title)
-            chapter_bodies.append(chapter_body)
-    else:
-        # No headings found, treat as single chapter
-        chapter_titles = ["Full Document"]
-        chapter_bodies = [markdown_text]
-    # Return with index to preserve duplicates
-    return [(f"{title}", body) for title, body in zip(chapter_titles, chapter_bodies)]
 
+# =========================
+# 📑 Markdown Splitting
+# =========================
+def split_markdown_into_chapters(markdown_text: str) -> list[tuple[str, str]]:
+    """
+    Splits markdown text into chapters based on H1/H2 headings.
+
+    Args:
+        markdown_text (str): Raw markdown document.
+
+    Returns:
+        list[tuple[str, str]]: List of (chapter_title, chapter_body).
+                               If no headings are found, returns one "Full Document" chapter.
+    """
+    # Split into alternating [pre-text, heading, body, heading, body...]
+    chapters = re.split(r'(?m)^#{1,2} (.+)$', markdown_text)
+
+    if len(chapters) > 1:
+        titles = [chapters[i].strip() for i in range(1, len(chapters), 2)]
+        bodies = [chapters[i + 1].strip() for i in range(1, len(chapters), 2)]
+    else:
+        titles = ["Full Document"]
+        bodies = [markdown_text]
+
+    return list(zip(titles, bodies))
+
+
+# =========================
+# ✨ Summarization
+# =========================
 def summarize_chapter(
     markdown_text: str,
     output_filename: str = "summary",
     model_choice: str = "Gemini"
-) -> tuple[str, str]:
+) -> tuple[str, str | None]:
     """
-    Summarizes the given markdown_text and saves it to the specified output_filename.
-    Returns (summary_text, output_path).
+    Summarizes a single markdown chapter.
+
+    Args:
+        markdown_text (str): The content of the chapter in Markdown.
+        output_filename (str): Suggested filename for saving the summary.
+        model_choice (str): Either "Gemini" or "OpenAI".
+
+    Returns:
+        tuple[str, str|None]: (summary_text, saved_file_path)  
+                              If error → ("⚠️ Error ...", None).
     """
     try:
+        # Detect language (default to Arabic on failure)
         try:
             lang = langdetect.detect(markdown_text)
-        except:
-            lang = "ar"  # Default to Arabic if detection fails
+        except Exception:
+            lang = "ar"
 
+        # Build summarization prompt
         prompt = f"{SUMMARY_PROMPT_TEMPLATE.strip()}\n\nLanguage: {lang}\n\nChapter Content:\n\n{markdown_text}"
 
+        # Generate summary
         if model_choice == "Gemini":
             model = genai.GenerativeModel("gemini-1.5-pro")
             response = model.generate_content(prompt)
-            summary_text = response.text.strip() if response and response.text else "*No summary generated.*"
+            summary_text = (response.text or "").strip()
         else:  # OpenAI
             client = OpenAI()
             response = client.chat.completions.create(
@@ -78,17 +103,26 @@ def summarize_chapter(
             )
             summary_text = response.choices[0].message.content.strip()
 
-        # Ensure output_filename is unique if needed (for duplicate chapter names)
+        if not summary_text:
+            summary_text = "*No summary generated.*"
+
+        # Ensure output directory exists
         output_folder = os.path.join("outputs", "summaries")
         os.makedirs(output_folder, exist_ok=True)
-        safe_filename = "".join(c for c in output_filename if c.isalnum() or c in (' ', '_', '-')).rstrip()
-        base_path = os.path.join(output_folder, f"{safe_filename}.md")
-        output_path = base_path
+
+        # Sanitize filename
+        safe_filename = "".join(c for c in output_filename if c.isalnum() or c in (" ", "_", "-")).rstrip()
+        if not safe_filename:
+            safe_filename = "summary"
+
+        # Avoid overwriting existing files
+        output_path = os.path.join(output_folder, f"{safe_filename}.md")
         count = 1
         while os.path.exists(output_path):
             output_path = os.path.join(output_folder, f"{safe_filename}_{count}.md")
             count += 1
 
+        # Save summary
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(summary_text)
 
@@ -97,11 +131,24 @@ def summarize_chapter(
     except Exception as e:
         return f"⚠️ Error during summarization: {e}", None
 
-def is_effectively_empty_chapter(text):
+
+# =========================
+# 🧹 Utility
+# =========================
+def is_effectively_empty_chapter(text: str) -> bool:
+    """
+    Determine if a chapter is effectively empty.
+
+    Args:
+        text (str): Chapter text.
+
+    Returns:
+        bool: True if empty or only contains page markers.
+    """
     stripped = text.strip()
     if not stripped:
         return True
+
+    # Detect page markers like: "### Page: ...\n```markdown\n```"
     page_marker_pattern = r"^### Page: .+\n```markdown\n*\s*```$"
-    if re.match(page_marker_pattern, stripped, re.MULTILINE):
-        return True
-    return False
+    return bool(re.match(page_marker_pattern, stripped, re.MULTILINE))
