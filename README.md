@@ -19,7 +19,6 @@ This project provides a modular OCR (Optical Character Recognition) and summariz
     │   └── summaries/              # Summarized Markdown chapters
     ├── static/                     # Temporary images and files
     ├── requirements.txt            # Python dependencies
-    ├── Samples/
     │   ├── Sample_book.pdf         # Sample PDF for OCR
     │   └── sample_qcm (1).jpg      # Sample image for OCR
     └── .gitignore
