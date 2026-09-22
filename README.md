@@ -14,14 +14,12 @@ This project provides a modular OCR (Optical Character Recognition) and summariz
     ├── utils/
     │   ├── pdf_utils.py            # PDF/image/table handling and Markdown post-processing (formulas/theorems)
     │   └── chapter_utils.py        # Chapter summarization utilities (Gemini/OpenAI prompt logic)
-    ├── outputs/
-    │   ├── saved_markdown/         # Extracted Markdown files
-    │   └── summaries/              # Summarized Markdown chapters
-    ├── static/                     # Temporary images and files
     ├── requirements.txt            # Python dependencies
-    │   ├── Sample_book.pdf         # Sample PDF for OCR
-    │   └── sample_qcm (1).jpg      # Sample image for OCR
     └── .gitignore
+
+> `static/` and `outputs/` are created at runtime by the app and are not part of
+> this repository. `Samples/` was removed — add your own documents if you want
+> sample inputs.
 
 ## 🚀 Features
 
@@ -30,8 +28,6 @@ This project provides a modular OCR (Optical Character Recognition) and summariz
   - [EasyOCR](https://github.com/JaidedAI/EasyOCR)
   - [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)
   - Gemini and OpenAI LLM APIs (with advanced Markdown and math/theorem preservation)
-- Save extracted Markdown files to `outputs/saved_markdown`
-- Summarize Markdown chapters and save to `outputs/summaries`
 - Mathematical formulas and theorems are accurately detected, preserved, and highlighted in both extraction and summarization
 - Modular utility functions in the `utils` folder
 - Streamlit UI for easy interaction
@@ -101,8 +97,6 @@ See `requirements.txt` for a full list. Major libraries include:
 - Ensure **Tesseract** is installed and added to your system path if using Tesseract.
 - **PDF support** is enabled via `pdf2image` and related libraries.
 - LLM features require valid Gemini and OpenAI API keys.
-- Extracted Markdown files are saved in `outputs/saved_markdown`.
-- Summaries are saved in `outputs/summaries`.
 - Mathematical formulas and theorems are preserved and highlighted throughout the pipeline.
 
 ## 📃 License
