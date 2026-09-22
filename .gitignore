@@ -15,8 +15,8 @@ __pycache__/
 # Runtime artifacts from app runs.
 # These directories collect every document uploaded to the app and everything
 # extracted from it. They are working output, not source, and must never be
-# committed: the repo already carries ~442 such files (~353 MB) from earlier
-# runs, including personal documents.
+# committed. 442 such files (~353 MB), including personal documents, were
+# tracked here before being purged from history — hence these rules.
 static/
 outputs/
 
