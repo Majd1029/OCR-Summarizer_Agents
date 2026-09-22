@@ -1,3 +1,35 @@
+# Secrets
 .env
+*.env
+
+# Virtual environments
+venv/
 ./venv
-__pycache__
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Runtime artifacts from app runs.
+# These directories collect every document uploaded to the app and everything
+# extracted from it. They are working output, not source, and must never be
+# committed: the repo already carries ~442 such files (~353 MB) from earlier
+# runs, including personal documents.
+static/
+outputs/
+
+# Sample inputs — keep only documents you own and intend to publish
+Samples/
+
+# Large media
+*.mp4
+*.mov
+*.avi
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
