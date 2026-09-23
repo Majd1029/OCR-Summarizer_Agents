@@ -2,6 +2,32 @@
 
 This project provides a modular OCR (Optical Character Recognition) and summarization pipeline supporting multiple OCR engines (Gemini, OpenAI, Tesseract, EasyOCR, PaddleOCR) and LLM-based summarization. It extracts text from scanned documents, images, and PDFs, preserves mathematical formulas and theorems, and can summarize Markdown chapters with high fidelity.
 
+## Hosted demo
+
+`app.py` is a trimmed Streamlit build of this pipeline, deployed on Streamlit
+Community Cloud. Two OCR backends, chosen by what you are reading:
+
+| Backend | Good at | Cost |
+|---|---|---|
+| **Tesseract** (`ara+fra+eng`) | Clean printed documents | Free, always on |
+| **Gemini Vision** | Handwriting, mathematical notation, complex tables | Your own API key |
+
+Tesseract is the default because it needs no key, and the app says plainly that
+the hard cases — scanned maths, handwriting — are where Gemini pulls ahead.
+That is what this project was built for; the free path is a floor, not the
+point. Three synthetic printed documents are bundled under `demo_samples/` so
+you can try it without uploading anything.
+
+Summaries run on a small open model in-process, so the free path is
+end-to-end free. Uploads are processed in memory and discarded with the session.
+
+Dependencies for the hosted demo are in `requirements.txt`. The full local stack
+for `OCR_Extractor.py`, `chapter_summarizer.py` and the `EXP/` backends
+(EasyOCR, PaddleOCR) is in `requirements-full.txt` — EasyOCR and OpenCV alone
+exceed the hosted memory ceiling.
+
+---
+
 ## 📁 Project Structure
 
     OCR-Summarizer-Agents/
