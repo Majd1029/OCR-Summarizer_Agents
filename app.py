@@ -21,9 +21,10 @@ with st.sidebar:
         "Engine",
         ["Tesseract — printed text", "Claude — handwriting, maths, tables"],
         captions=[
-            "Free, always on. Good on clean printed Arabic / French / English. "
-            "Struggles with handwriting, mathematical notation and complex "
-            "table layouts.",
+            "Free, always on. Reads clean printed French and English well. "
+            "Arabic comes out unreliable even on printed text, so use Claude "
+            "for that. Also struggles with handwriting, mathematical notation "
+            "and complex table layouts.",
             "Far better on exactly those hard cases, and what this project was "
             "built around. Needs your own Anthropic API key.",
         ],
@@ -34,9 +35,9 @@ with st.sidebar:
     if backend == "Tesseract":
         st.info(
             "Tesseract is the free path, so it is the default. It reads clean "
-            "printed documents well. For the scanned maths and handwriting this "
-            "project was originally built for, switch to Claude — that is where "
-            "the difference shows.",
+            "printed Latin-script documents well. For Arabic, handwriting or "
+            "mathematical notation — what this project was originally built "
+            "for — switch to Claude. That is where the difference shows.",
             icon=":material/info:",
         )
 
@@ -69,8 +70,9 @@ with tab_extract:
                                 type=["pdf", "png", "jpg", "jpeg"])
 
     if sample_files and not uploaded:
-        st.caption("No document to hand? Try one of these — clean printed text, "
-                   "which is what the free Tesseract path handles well.")
+        st.caption("No document to hand? Try one of these — clean printed "
+                   "Latin-script text, which is what the free Tesseract path "
+                   "handles well.")
         cols = st.columns(len(sample_files))
         for col, f in zip(cols, sample_files):
             if f.suffix.lower() != ".pdf":
