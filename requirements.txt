@@ -1,15 +1,18 @@
-streamlit
-pytesseract
-opencv-python
-pdf2image
-pillow
-easyocr
-google-generativeai
-openai>=1.0.0
-pandas
-python-dotenv
-numpy
-PyMuPDF
-langdetect
-regex
-typing-extensions
+# REQUIRES PYTHON 3.11
+# Set it in Streamlit Cloud: Settings -> General -> Python version, or under
+# Advanced settings when first deploying. The torch and transformers pins
+# below have no wheels for 3.14 and the build fails outright.
+#
+# --extra-index-url must be on its own line; putting it after a package name
+# is invalid requirements.txt syntax and pip ignores the whole directive.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+streamlit==1.64.0
+pytesseract==0.3.13
+pymupdf==1.25.1
+pillow==11.0.0
+torch==2.14.0+cpu
+transformers==5.17.0
+accelerate==1.15.0
+google-generativeai==0.8.3
+langdetect==1.0.9

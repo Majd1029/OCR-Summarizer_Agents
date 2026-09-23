@@ -1,0 +1,21 @@
+streamlit
+pytesseract
+opencv-python
+pdf2image
+pillow
+easyocr
+google-generativeai
+openai>=1.0.0
+pandas
+python-dotenv
+numpy
+PyMuPDF
+langdetect
+regex
+typing-extensions
+# ---------------------------------------------------------------------------
+# This is the full local stack for OCR_Extractor.py, chapter_summarizer.py and
+# the EXP/ backends (EasyOCR, PaddleOCR, Tesseract). It is NOT what the hosted
+# demo installs: easyocr and opencv alone would blow the memory ceiling.
+# The deployed app (app.py) uses the lighter root requirements.txt.
+#   pip install -r requirements-full.txt
