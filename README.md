@@ -20,7 +20,7 @@ That is what this project was built for; the free path is a floor, not the
 point. Three synthetic printed documents are bundled under `demo_samples/` so
 you can try it without uploading anything.
 
-Arabic is configured in Tesseract but its output is unreliable even on clean printed pages, so the bundled samples are Latin-script only and the app points Arabic users at Claude. That gap is the reason this project used a vision model in the first place.
+Arabic is configured in Tesseract but its output is unreliable even on clean printed pages. The bundled Arabic sample is kept deliberately: running it through both backends shows the gap directly, and that gap is the reason this project used a vision model in the first place.
 
 Summaries run on a small open model in-process, so the free path is
 end-to-end free. Uploads are processed in memory and discarded with the session.
