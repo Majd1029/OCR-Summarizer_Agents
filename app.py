@@ -19,32 +19,32 @@ with st.sidebar:
     st.subheader("⚙️ Backend")
     backend = st.radio(
         "Engine",
-        ["Tesseract — printed text", "Gemini — handwriting, maths, tables"],
+        ["Tesseract — printed text", "Claude — handwriting, maths, tables"],
         captions=[
             "Free, always on. Good on clean printed Arabic / French / English. "
             "Struggles with handwriting, mathematical notation and complex "
             "table layouts.",
             "Far better on exactly those hard cases, and what this project was "
-            "built around. Needs your own API key — free from Google.",
+            "built around. Needs your own Anthropic API key.",
         ],
     )
-    backend = "Gemini" if backend.startswith("Gemini") else "Tesseract"
+    backend = "Claude" if backend.startswith("Claude") else "Tesseract"
 
     api_key = None
     if backend == "Tesseract":
         st.info(
             "Tesseract is the free path, so it is the default. It reads clean "
             "printed documents well. For the scanned maths and handwriting this "
-            "project was originally built for, switch to Gemini — that is where "
+            "project was originally built for, switch to Claude — that is where "
             "the difference shows.",
             icon=":material/info:",
         )
 
-    if backend == "Gemini":
-        api_key = st.text_input("Gemini API key", type="password")
+    if backend == "Claude":
+        api_key = st.text_input("Claude API key", type="password")
         st.caption(
             "Held in this browser session only — never stored, logged or sent "
-            "anywhere except Google. Get one free at aistudio.google.com/apikey."
+            "anywhere except Anthropic. Create one at console.anthropic.com."
         )
         if not api_key:
             st.warning("No key entered — switch to Tesseract or paste a key.")
@@ -108,7 +108,7 @@ with tab_extract:
             st.caption("Keep the range small — each page is a separate OCR pass.")
 
         if st.button("🚀 Extract text", type="primary",
-                     disabled=(backend == "Gemini" and not api_key)):
+                     disabled=(backend == "Claude" and not api_key)):
             try:
                 if is_pdf:
                     with st.spinner("Rendering pages..."):
@@ -164,7 +164,7 @@ with tab_summarize:
         selected = st.multiselect("Chapters", titles, default=titles[:3])
 
         if st.button("🧠 Summarize", type="primary",
-                     disabled=(backend == "Gemini" and not api_key)):
+                     disabled=(backend == "Claude" and not api_key)):
             for title, body in chapters:
                 if title not in selected:
                     continue

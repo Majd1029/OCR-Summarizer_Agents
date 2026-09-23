@@ -14,5 +14,5 @@ pillow==11.0.0
 torch==2.14.0+cpu
 transformers==5.17.0
 accelerate==1.15.0
-google-generativeai==0.8.3
+anthropic>=1.0.0
 langdetect==1.0.9
