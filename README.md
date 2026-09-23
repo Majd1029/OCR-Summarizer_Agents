@@ -11,7 +11,7 @@ Community Cloud. Two OCR backends, chosen by what you are reading:
 
 | Backend | Good at | Cost |
 |---|---|---|
-| **Tesseract** (`ara+fra+eng`) | Clean printed documents | Free, always on |
+| **Tesseract** (`ara+fra+eng`) | Clean printed French / English | Free, always on |
 | **Claude vision** (`claude-opus-5`) | Handwriting, mathematical notation, complex tables | Your own `CLAUDE_API_KEY` |
 
 Tesseract is the default because it needs no key, and the app says plainly that
@@ -19,6 +19,8 @@ the hard cases — scanned maths, handwriting — are where Claude pulls ahead.
 That is what this project was built for; the free path is a floor, not the
 point. Three synthetic printed documents are bundled under `demo_samples/` so
 you can try it without uploading anything.
+
+Arabic is configured in Tesseract but its output is unreliable even on clean printed pages, so the bundled samples are Latin-script only and the app points Arabic users at Claude. That gap is the reason this project used a vision model in the first place.
 
 Summaries run on a small open model in-process, so the free path is
 end-to-end free. Uploads are processed in memory and discarded with the session.
