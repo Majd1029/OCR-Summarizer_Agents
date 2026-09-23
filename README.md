@@ -10,10 +10,10 @@ Community Cloud. Two OCR backends, chosen by what you are reading:
 | Backend | Good at | Cost |
 |---|---|---|
 | **Tesseract** (`ara+fra+eng`) | Clean printed documents | Free, always on |
-| **Gemini Vision** | Handwriting, mathematical notation, complex tables | Your own API key |
+| **Claude vision** (`claude-opus-5`) | Handwriting, mathematical notation, complex tables | Your own `CLAUDE_API_KEY` |
 
 Tesseract is the default because it needs no key, and the app says plainly that
-the hard cases — scanned maths, handwriting — are where Gemini pulls ahead.
+the hard cases — scanned maths, handwriting — are where Claude pulls ahead.
 That is what this project was built for; the free path is a floor, not the
 point. Three synthetic printed documents are bundled under `demo_samples/` so
 you can try it without uploading anything.
