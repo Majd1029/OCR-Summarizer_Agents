@@ -70,9 +70,10 @@ with tab_extract:
                                 type=["pdf", "png", "jpg", "jpeg"])
 
     if sample_files and not uploaded:
-        st.caption("No document to hand? Try one of these — clean printed "
-                   "Latin-script text, which is what the free Tesseract path "
-                   "handles well.")
+        st.caption("No document to hand? Try one of these. The English and "
+                   "French pages are what the free Tesseract path handles "
+                   "well; the Arabic one is worth running through both "
+                   "backends — Tesseract mangles it, Claude does not.")
         cols = st.columns(len(sample_files))
         for col, f in zip(cols, sample_files):
             if f.suffix.lower() != ".pdf":
