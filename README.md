@@ -12,10 +12,10 @@ Community Cloud. Two OCR backends, chosen by what you are reading:
 | Backend | Good at | Cost |
 |---|---|---|
 | **Tesseract** (`ara+fra+eng`) | Clean printed French / English | Free, always on |
-| **Claude vision** (`claude-opus-5`) | Handwriting, mathematical notation, complex tables | Your own `CLAUDE_API_KEY` |
+| **Vision LLM** (Anthropic API) | Handwriting, mathematical notation, complex tables | Your own API key |
 
 Tesseract is the default because it needs no key, and the app says plainly that
-the hard cases — scanned maths, handwriting — are where Claude pulls ahead.
+the hard cases — scanned maths, handwriting — are where the vision LLM pulls ahead.
 That is what this project was built for; the free path is a floor, not the
 point. Three synthetic printed documents are bundled under `demo_samples/` so
 you can try it without uploading anything.

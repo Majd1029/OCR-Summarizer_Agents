@@ -5,8 +5,8 @@ original code persisted every upload under static/.
 
 Two backends:
   * Tesseract (ara+fra+eng) - free, always on, good on clean printed text.
-  * Claude vision - for handwriting, mathematical notation and complex tables,
-    using the visitor's own CLAUDE_API_KEY.
+  * Vision LLM (Anthropic API) - for handwriting, mathematical notation and
+    complex tables, using the visitor's own API key.
 """
 import base64
 import io
@@ -32,7 +32,7 @@ content in Arabic, English and French.
 
 TESS_LANGS = "ara+fra+eng"
 
-CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-5")
+LLM_MODEL = os.getenv("LLM_MODEL", "claude-opus-5")
 MAX_TOKENS = int(os.getenv("OCR_MAX_TOKENS", "8000"))
 
 
@@ -59,8 +59,8 @@ def _png_b64(image: Image.Image) -> str:
     return base64.standard_b64encode(buf.getvalue()).decode("utf-8")
 
 
-def ocr_claude(image: Image.Image, api_key: str) -> str:
-    """Transcribe one page with Claude vision.
+def ocr_vision_llm(image: Image.Image, api_key: str) -> str:
+    """Transcribe one page with the vision LLM.
 
     Adaptive thinking is on: multilingual layout with RTL, LaTeX and tables is
     exactly the kind of work that benefits from it. Server-side fallbacks are
@@ -72,7 +72,7 @@ def ocr_claude(image: Image.Image, api_key: str) -> str:
     client = anthropic.Anthropic(api_key=api_key)
 
     response = client.beta.messages.create(
-        model=CLAUDE_MODEL,
+        model=LLM_MODEL,
         max_tokens=MAX_TOKENS,
         betas=["server-side-fallback-2026-07-01"],
         fallbacks="default",
@@ -100,7 +100,7 @@ def ocr_claude(image: Image.Image, api_key: str) -> str:
     if response.stop_reason == "refusal":
         detail = getattr(response, "stop_details", None)
         reason = getattr(detail, "explanation", None) or "declined by a safety classifier"
-        return f"*[Claude declined this page: {reason}]*"
+        return f"*[The model declined this page: {reason}]*"
 
     # content is a list of blocks; with thinking on, only text blocks carry the
     # transcription.
@@ -109,8 +109,8 @@ def ocr_claude(image: Image.Image, api_key: str) -> str:
 
 
 def run_ocr(image: Image.Image, backend: str, api_key: str | None = None) -> str:
-    if backend == "Claude":
+    if backend == "Vision LLM":
         if not api_key:
-            raise ValueError("Paste a Claude API key in the sidebar, or use Tesseract.")
-        return ocr_claude(image, api_key)
+            raise ValueError("Paste an Anthropic API key in the sidebar, or use Tesseract.")
+        return ocr_vision_llm(image, api_key)
     return ocr_tesseract(image)

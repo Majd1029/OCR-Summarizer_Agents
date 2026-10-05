@@ -1,8 +1,8 @@
 """Chapter splitting and summarisation.
 
 The free path runs a small open model in-process so the hosted demo never
-depends on a paid key. Claude is available for visitors who supply their own
-CLAUDE_API_KEY, and is markedly better on dense technical material.
+depends on a paid key. A hosted LLM (Anthropic API) is available for visitors
+who supply their own API key, and is markedly better on dense technical material.
 """
 import os
 import re
@@ -18,8 +18,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 LOCAL_MODEL = os.getenv("SUMMARY_MODEL", "Qwen/Qwen2.5-0.5B-Instruct")
 MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "400"))
 
-CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-5")
-CLAUDE_MAX_TOKENS = int(os.getenv("SUMMARY_MAX_TOKENS", "4000"))
+LLM_MODEL = os.getenv("LLM_MODEL", "claude-opus-5")
+LLM_MAX_TOKENS = int(os.getenv("SUMMARY_MAX_TOKENS", "4000"))
 
 SUMMARY_PROMPT = """You summarise academic and educational documents.
 
@@ -78,13 +78,13 @@ def _summarize_local(body: str) -> str:
     ).strip()
 
 
-def _summarize_claude(body: str, api_key: str) -> str:
+def _summarize_llm(body: str, api_key: str) -> str:
     import anthropic
 
     client = anthropic.Anthropic(api_key=api_key)
     response = client.beta.messages.create(
-        model=CLAUDE_MODEL,
-        max_tokens=CLAUDE_MAX_TOKENS,
+        model=LLM_MODEL,
+        max_tokens=LLM_MAX_TOKENS,
         betas=["server-side-fallback-2026-07-01"],
         fallbacks="default",
         thinking={"type": "adaptive"},
@@ -95,7 +95,7 @@ def _summarize_claude(body: str, api_key: str) -> str:
     if response.stop_reason == "refusal":
         detail = getattr(response, "stop_details", None)
         reason = getattr(detail, "explanation", None) or "declined by a safety classifier"
-        return f"*[Claude declined this chapter: {reason}]*"
+        return f"*[The model declined this chapter: {reason}]*"
 
     parts = [b.text for b in response.content if b.type == "text"]
     return "\n".join(parts).strip()
@@ -104,8 +104,8 @@ def _summarize_claude(body: str, api_key: str) -> str:
 def summarize_chapter(body: str, backend: str, api_key: str | None = None) -> str:
     if not body.strip():
         return "*This chapter is empty.*"
-    if backend == "Claude":
+    if backend == "Vision LLM":
         if not api_key:
-            raise ValueError("Paste a Claude API key in the sidebar.")
-        return _summarize_claude(body, api_key)
+            raise ValueError("Paste an Anthropic API key in the sidebar.")
+        return _summarize_llm(body, api_key)
     return _summarize_local(body)
