@@ -1,15 +1,3 @@
----
-title: OCR Summarizer
-emoji: 📖
-colorFrom: yellow
-colorTo: red
-sdk: gradio
-sdk_version: 6.29.0
-app_file: app.py
-pinned: false
-short_description: Multilingual OCR to Markdown, then chapter summaries
----
-
 # OCR-Summarizer-Agents
 
 **[Try the live demo](https://majd-ocr-summarizer.streamlit.app)** — free Tesseract path needs no key; three printed sample documents are bundled.
@@ -18,58 +6,56 @@ This project provides a modular OCR (Optical Character Recognition) and summariz
 
 ## Hosted demo
 
-A trimmed build of this pipeline runs as a static page on Vercel (`web/`)
-backed by a free Hugging Face ZeroGPU Space (`app.py`):
+A trimmed build of this pipeline runs **entirely in the browser** as a static
+page on Vercel (`web/index.html`). There is no server: uploaded files never leave
+the visitor's device.
 
-```
-Vercel (web/index.html)  ──@gradio/client──▶  Hugging Face Space (app.py)
-   static page, free                            Tesseract + summarizer, free ZeroGPU
-```
+| Step | Runs on | Library |
+|---|---|---|
+| PDF pages → images (200 dpi) | browser | pdf.js |
+| OCR, free path (`ara+fra+eng`) | browser (WebAssembly) | Tesseract.js |
+| OCR, vision LLM path | Anthropic API, with the visitor's own key | Anthropic JS SDK |
+| Summaries, free path | browser (WebGPU, or WebAssembly) | transformers.js + Qwen2.5-0.5B-Instruct |
+| Summaries, vision LLM path | Anthropic API, with the visitor's own key | Anthropic JS SDK |
 
 Two OCR backends, chosen by what you are reading:
 
 | Backend | Good at | Cost |
 |---|---|---|
-| **Tesseract** (`ara+fra+eng`) | Clean printed French / English | Free, always on |
+| **Tesseract** (`ara+fra+eng`) | Clean printed French / English | Free, a few MB of language data on first use |
 | **Vision LLM** (Anthropic API) | Handwriting, mathematical notation, complex tables | Your own API key |
 
-Tesseract is the default because it needs no key, and the app says plainly that
+Tesseract is the default because it needs no key, and the page says plainly that
 the hard cases — scanned maths, handwriting — are where the vision LLM pulls ahead.
 That is what this project was built for; the free path is a floor, not the
 point. Three synthetic printed documents are bundled under `web/samples/` so
 you can try it without uploading anything.
 
-Arabic is configured in Tesseract but its output is unreliable even on clean printed pages. The bundled Arabic sample is kept deliberately: running it through both backends shows the gap directly, and that gap is the reason this project used a vision model in the first place.
+Arabic is configured in Tesseract, but its output is less reliable than on Latin
+script, especially on real scans. The bundled Arabic sample is kept deliberately:
+running it through both backends shows the gap directly.
 
-Summaries run on a small open model (Qwen2.5-0.5B-Instruct) inside the Space,
-on the ZeroGPU GPU, so the free path is end-to-end free. Uploads are processed
-in memory and discarded after each request. Up to 5 PDF pages are read per
-request.
+The free summarizer downloads the model once (a few hundred MB) and the browser
+caches it. The API key, when used, goes from the browser straight to Anthropic
+and is never stored. Up to 5 PDF pages are read per run.
 
-### Space API
+To deploy: on vercel.com, **Add New → Project**, import this repo, set **Root
+Directory** to `web`, Framework **Other**, no build command.
 
-| Endpoint | Inputs | Returns |
-|---|---|---|
-| `/extract` | `file`, `start`, `end`, `backend`, `api_key` | Markdown, page info |
-| `/summarize` | `text`, `backend`, `api_key` | summary Markdown |
+### Running the pipeline in Python
 
-`backend` is `Tesseract` or `Vision LLM`; the API key is only needed for the latter.
+`app.py` is a Gradio app with the same two steps server-side (`ocr_backends.py`,
+`summarizer.py`), for running locally or on a GPU machine:
 
-### Deploying
+```bash
+sudo apt install tesseract-ocr tesseract-ocr-ara tesseract-ocr-fra   # see packages.txt
+pip install gradio -r requirements.txt
+python app.py
+```
 
-1. **Hugging Face Space:** create a new Space named `ocr-summarizer` → SDK
-   **Gradio** → *Blank* → hardware **ZeroGPU** (the free option), **Public**.
-2. **GitHub:** Settings → Secrets and variables → Actions → secret `HF_TOKEN`
-   (a write token) and variable `HF_SPACE` = `MA29/ocr-summarizer`. Then run the
-   **Sync to Hugging Face Space** workflow (Actions tab). It copies the app
-   files, `requirements.txt` and `packages.txt` (Tesseract) to the Space.
-3. **Vercel:** Add New → Project → import this repo → Root Directory `web`,
-   Framework **Other**, no build command.
-
-Dependencies for the hosted demo are in `requirements.txt`. The full local stack
+Dependencies for `app.py` are in `requirements.txt`. The full local stack
 for `OCR_Extractor.py`, `chapter_summarizer.py` and the `EXP/` backends
-(EasyOCR, PaddleOCR) is in `requirements-full.txt` — EasyOCR and OpenCV alone
-exceed the hosted memory ceiling.
+(EasyOCR, PaddleOCR) is in `requirements-full.txt`.
 
 ---
 
