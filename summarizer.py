@@ -1,8 +1,10 @@
 """Chapter splitting and summarisation.
 
 The free path runs a small open model in-process so the hosted demo never
-depends on a paid key. A hosted LLM (Anthropic API) is available for visitors
-who supply their own API key, and is markedly better on dense technical material.
+depends on a paid key. On a Hugging Face ZeroGPU Space the model is loaded at
+startup and generation runs on the GPU; elsewhere it loads lazily on CPU.
+A hosted LLM (Anthropic API) is available for visitors who supply their own
+API key, and is markedly better on dense technical material.
 """
 import os
 import re
@@ -11,9 +13,16 @@ import threading
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# bfloat16, not float32: measured 1568 MB vs 2686 MB peak RSS for this model,
-# against a ~2.7 GB ceiling once Streamlit's own footprint is added. It is also
-# ~2.4x faster at decode, since generation is memory-bandwidth-bound.
+try:
+    import spaces  # only present on Hugging Face Spaces
+except ImportError:
+    spaces = None
+
+ZERO_GPU = spaces is not None and os.getenv("SPACES_ZERO_GPU", "").lower() in {"1", "true"}
+DEVICE = "cuda" if ZERO_GPU or torch.cuda.is_available() else "cpu"
+
+# bfloat16, not float32: measured 1568 MB vs 2686 MB peak RSS for this model on
+# CPU, and ~2.4x faster at decode, since generation is memory-bandwidth-bound.
 # transformers 5.x renamed torch_dtype -> dtype.
 LOCAL_MODEL = os.getenv("SUMMARY_MODEL", "Qwen/Qwen2.5-0.5B-Instruct")
 MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "400"))
@@ -55,6 +64,24 @@ def split_markdown_into_chapters(markdown_text: str):
     return [("Full Document", markdown_text)]
 
 
+def _gpu(fn):
+    """On ZeroGPU, a GPU is attached only while a @spaces.GPU function runs."""
+    return spaces.GPU(duration=60)(fn) if ZERO_GPU else fn
+
+
+@_gpu
+def _generate(inputs, max_new_tokens):
+    tok, model = _load_local()
+    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+    with torch.no_grad():
+        return model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            pad_token_id=tok.eos_token_id,
+        ).cpu()
+
+
 def _summarize_local(body: str) -> str:
     tok, model = _load_local()
     prompt = tok.apply_chat_template(
@@ -66,13 +93,7 @@ def _summarize_local(body: str) -> str:
         add_generation_prompt=True,
     )
     inputs = tok(prompt, return_tensors="pt", truncation=True, max_length=3072)
-    with torch.no_grad():
-        out = model.generate(
-            **inputs,
-            max_new_tokens=MAX_NEW_TOKENS,
-            do_sample=False,
-            pad_token_id=tok.eos_token_id,
-        )
+    out = _generate(dict(inputs), MAX_NEW_TOKENS)
     return tok.decode(
         out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True
     ).strip()
@@ -109,3 +130,9 @@ def summarize_chapter(body: str, backend: str, api_key: str | None = None) -> st
             raise ValueError("Paste an Anthropic API key in the sidebar.")
         return _summarize_llm(body, api_key)
     return _summarize_local(body)
+
+
+if ZERO_GPU:
+    # Load once at startup and park the weights on the GPU; ZeroGPU moves them
+    # onto a real device for each @spaces.GPU call.
+    _load_local()[1].to(DEVICE)

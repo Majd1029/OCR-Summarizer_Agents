@@ -1,18 +1,12 @@
-# REQUIRES PYTHON 3.11
-# Set it in Streamlit Cloud: Settings -> General -> Python version, or under
-# Advanced settings when first deploying. The torch and transformers pins
-# below have no wheels for 3.14 and the build fails outright.
-#
-# --extra-index-url must be on its own line; putting it after a package name
-# is invalid requirements.txt syntax and pip ignores the whole directive.
---extra-index-url https://download.pytorch.org/whl/cpu
+# Installed by the Hugging Face Space (Gradio SDK, ZeroGPU hardware), next to
+# Gradio itself (sdk_version in README.md). Tesseract and its language packs
+# come from packages.txt. ZeroGPU runs Python 3.10 and provides its own CUDA
+# build of torch, so torch is left unpinned.
 
-streamlit==1.64.0
 pytesseract==0.3.13
 pymupdf==1.25.1
 pillow==11.0.0
-torch==2.14.0+cpu
+torch
 transformers==5.17.0
 accelerate==1.15.0
 anthropic>=1.0.0
-langdetect==1.0.9
