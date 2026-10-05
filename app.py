@@ -19,17 +19,17 @@ with st.sidebar:
     st.subheader("⚙️ Backend")
     backend = st.radio(
         "Engine",
-        ["Tesseract — printed text", "Claude — handwriting, maths, tables"],
+        ["Tesseract — printed text", "Vision LLM — handwriting, maths, tables"],
         captions=[
             "Free, always on. Reads clean printed French and English well. "
-            "Arabic comes out unreliable even on printed text, so use Claude "
-            "for that. Also struggles with handwriting, mathematical notation "
+            "Arabic comes out unreliable even on printed text, so use the "
+            "vision LLM for that. Also struggles with handwriting, mathematical notation "
             "and complex table layouts.",
             "Far better on exactly those hard cases, and what this project was "
             "built around. Needs your own Anthropic API key.",
         ],
     )
-    backend = "Claude" if backend.startswith("Claude") else "Tesseract"
+    backend = "Vision LLM" if backend.startswith("Vision") else "Tesseract"
 
     api_key = None
     if backend == "Tesseract":
@@ -37,12 +37,12 @@ with st.sidebar:
             "Tesseract is the free path, so it is the default. It reads clean "
             "printed Latin-script documents well. For Arabic, handwriting or "
             "mathematical notation — what this project was originally built "
-            "for — switch to Claude. That is where the difference shows.",
+            "for — switch to the vision LLM. That is where the difference shows.",
             icon=":material/info:",
         )
 
-    if backend == "Claude":
-        api_key = st.text_input("Claude API key", type="password")
+    if backend == "Vision LLM":
+        api_key = st.text_input("Anthropic API key", type="password")
         st.caption(
             "Held in this browser session only — never stored, logged or sent "
             "anywhere except Anthropic. Create one at console.anthropic.com."
@@ -73,7 +73,7 @@ with tab_extract:
         st.caption("No document to hand? Try one of these. The English and "
                    "French pages are what the free Tesseract path handles "
                    "well; the Arabic one is worth running through both "
-                   "backends — Tesseract mangles it, Claude does not.")
+                   "backends — Tesseract mangles it, the vision LLM does not.")
         cols = st.columns(len(sample_files))
         for col, f in zip(cols, sample_files):
             if f.suffix.lower() != ".pdf":
@@ -111,7 +111,7 @@ with tab_extract:
             st.caption("Keep the range small — each page is a separate OCR pass.")
 
         if st.button("🚀 Extract text", type="primary",
-                     disabled=(backend == "Claude" and not api_key)):
+                     disabled=(backend == "Vision LLM" and not api_key)):
             try:
                 if is_pdf:
                     with st.spinner("Rendering pages..."):
@@ -167,7 +167,7 @@ with tab_summarize:
         selected = st.multiselect("Chapters", titles, default=titles[:3])
 
         if st.button("🧠 Summarize", type="primary",
-                     disabled=(backend == "Claude" and not api_key)):
+                     disabled=(backend == "Vision LLM" and not api_key)):
             for title, body in chapters:
                 if title not in selected:
                     continue
