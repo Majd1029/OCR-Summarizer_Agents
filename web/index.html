@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OCR → Summarizer — Majd Aguir</title>
+  <meta name="description" content="Multilingual OCR (Arabic, French, English) to Markdown, then chapter summaries. Free Tesseract path or a vision LLM with your own key.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <script>
+    // The Hugging Face Space that runs app.py, as "owner/name".
+    window.SPACE_ID = 'MA29/ocr-summarizer';
+  </script>
+  <style>
+    :root {
+      --bg: #f5f5f7; --card: #ffffff; --card-2: #f2f2f4; --text: #1d1d1f; --muted: #6e6e73;
+      --border: rgba(0, 0, 0, 0.07); --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.05);
+      --accent: #ea580c; --accent-2: #f59e0b; --ok: #16a34a; --warn: #d97706; --bad: #dc2626;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0b0b0c; --card: #161618; --card-2: #1f1f22; --text: #f5f5f7; --muted: #a1a1a6;
+        --border: rgba(255,255,255,.08); --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+        --accent: #fb923c; --accent-2: #fbbf24; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; }
+    [hidden] { display: none !important; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 56px; }
+
+    header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 26px; }
+    h1 { font-size: clamp(28px, 4vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
+    h1 span { background: linear-gradient(120deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .sub { color: var(--muted); margin-top: 8px; font-size: 16px; max-width: 620px; }
+    h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+    .status { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); font-size: 14px; font-weight: 500; white-space: nowrap; box-shadow: var(--shadow); }
+    .status i { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+    .status[data-state="ready"] i { background: var(--ok); }
+    .status[data-state="waking"] i, .status[data-state="loading"] i, .status[data-state="busy"] i { background: var(--warn); animation: pulse 1.2s infinite; }
+    .status[data-state="error"] i { background: var(--bad); }
+    @keyframes pulse { 50% { opacity: .35; } }
+
+    .grid { display: grid; grid-template-columns: 380px 1fr; gap: 20px; align-items: start; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--shadow); padding: 24px; min-width: 0; }
+    .label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 8px; }
+    .side > * + * { margin-top: 20px; }
+
+    .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; background: var(--card-2); border-radius: 14px; }
+    .seg button { font: 600 14px 'Inter', sans-serif; padding: 9px 8px; border-radius: 10px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+    .seg button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+    .hint { font-size: 13px; color: var(--muted); margin-top: 8px; }
+    input[type=password], input[type=number] { width: 100%; font: 500 15px 'Inter', sans-serif; color: var(--text); background: var(--card-2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; outline: none; }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent); }
+
+    .drop { display: grid; place-items: center; text-align: center; padding: 26px 16px; border-radius: 18px; border: 2px dashed color-mix(in srgb, var(--muted) 40%, transparent); background: var(--card-2); cursor: pointer; color: var(--muted); font-size: 14px; transition: border-color .2s; }
+    .drop:hover, .drop:focus-visible, .drop.over { border-color: var(--accent); outline: none; }
+    .drop b { display: block; color: var(--text); font-size: 15px; margin: 6px 0 2px; }
+    .drop svg { color: var(--accent); }
+    .drop input { display: none; }
+    .file { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: var(--card-2); font-size: 14px; }
+    .file span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+    .file button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; }
+    .samples { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .sample { border: 2px solid transparent; border-radius: 12px; padding: 0; background: var(--card-2); cursor: pointer; overflow: hidden; text-align: left; font: 500 12px 'Inter', sans-serif; color: var(--text); }
+    .sample img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; object-position: top; }
+    .sample span { display: block; padding: 6px 8px; }
+    .sample:hover, .sample:focus-visible, .sample[aria-pressed="true"] { border-color: var(--accent); outline: none; }
+    .pages { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; height: 50px; padding: 0 24px; border-radius: 999px; border: 1px solid transparent; font: 600 16px 'Inter', sans-serif; cursor: pointer; transition: transform .15s, opacity .2s; text-decoration: none; }
+    .btn:hover:not(:disabled) { transform: translateY(-1px); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary { width: 100%; background: linear-gradient(120deg, var(--accent), var(--accent-2)); color: #fff; box-shadow: 0 8px 22px rgba(234, 88, 12, .28); }
+    .btn-light { height: 38px; padding: 0 14px; font-size: 13px; background: var(--card-2); color: var(--text); border-color: var(--border); }
+
+    .tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border); margin: -4px 0 18px; }
+    .tab { font: 600 15px 'Inter', sans-serif; padding: 10px 14px; border: 0; background: none; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+    .tab:disabled { opacity: .45; cursor: not-allowed; }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; font-size: 14px; color: var(--muted); }
+    .toolbar .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .empty { display: grid; place-items: center; text-align: center; color: var(--muted); padding: 60px 16px; min-height: 360px; border-radius: 18px; background: radial-gradient(circle at 20% 15%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 55%), var(--card-2); }
+    .empty b { display: block; color: var(--text); font-size: 18px; margin-bottom: 6px; }
+    .spinner { width: 40px; height: 40px; border-radius: 50%; border: 4px solid color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent); animation: spin 1s linear infinite; margin: 0 auto 14px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .md { font-size: 15px; line-height: 1.7; overflow-wrap: anywhere; }
+    .md > * + * { margin-top: .8em; }
+    .md h1, .md h2, .md h3 { line-height: 1.25; letter-spacing: -0.01em; margin-top: 1.2em; }
+    .md h1 { font-size: 22px; } .md h2 { font-size: 19px; } .md h3 { font-size: 16px; }
+    .md ul, .md ol { padding-left: 1.4em; }
+    .md table { border-collapse: collapse; width: 100%; display: block; overflow-x: auto; }
+    .md td, .md th { padding: 6px 10px; border: 1px solid var(--border); vertical-align: top; }
+    .md code { font-size: 13px; background: var(--card-2); padding: 2px 5px; border-radius: 6px; }
+    .md pre { background: var(--card-2); padding: 12px 14px; border-radius: 12px; overflow-x: auto; }
+    .md [align="right"], .md [dir="rtl"] { direction: rtl; text-align: right; }
+    .raw { width: 100%; min-height: 420px; resize: vertical; font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); background: var(--card-2); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+
+    .chapters { list-style: none; display: grid; gap: 8px; margin-bottom: 16px; max-height: 260px; overflow: auto; }
+    .chapters label { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--card-2); cursor: pointer; font-size: 14px; }
+    .chapters input { accent-color: var(--accent); width: 16px; height: 16px; }
+    .summary { border-top: 1px solid var(--border); padding-top: 18px; margin-top: 18px; }
+    .summary header { margin: 0 0 10px; align-items: center; }
+
+    .msg { margin-top: 14px; padding: 12px 14px; border-radius: 14px; font-size: 14px; display: none; }
+    .msg.show { display: block; }
+    .msg.error { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+    .msg.info { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--text); }
+
+    footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+    footer a { text-decoration: none; font-weight: 500; }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 480px) { .wrap { padding: 24px 16px 40px; } .card { padding: 18px; border-radius: 20px; } }
+    @media (prefers-reduced-motion: reduce) { .spinner, .status i { animation: none; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1><span>OCR</span> → Summarizer</h1>
+        <p class="sub">Turn a scanned page or PDF (Arabic, French or English) into Markdown, then summarize it chapter by chapter.</p>
+      </div>
+      <div class="status" id="status" data-state="waking" role="status" aria-live="polite"><i></i><span>Connecting…</span></div>
+    </header>
+
+    <div class="grid">
+      <aside class="card side">
+        <div>
+          <span class="label">Engine</span>
+          <div class="seg" role="group" aria-label="Engine">
+            <button type="button" data-backend="Tesseract" aria-pressed="true">Tesseract</button>
+            <button type="button" data-backend="Vision LLM" aria-pressed="false">Vision LLM</button>
+          </div>
+          <p class="hint" id="engineHint"></p>
+          <div id="keyBox" hidden style="margin-top:12px">
+            <label class="label" for="apiKey">Anthropic API key</label>
+            <input type="password" id="apiKey" autocomplete="off" placeholder="sk-ant-…">
+            <p class="hint">Sent only with your requests, never stored. Get one at console.anthropic.com.</p>
+          </div>
+        </div>
+
+        <div>
+          <span class="label">Document</span>
+          <label class="drop" id="drop" tabindex="0">
+            <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*">
+            <span>
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 18v-6M9 15l3-3 3 3"/></svg>
+              <b>Drop a PDF or image</b>or click to choose · up to 20 MB
+            </span>
+          </label>
+          <div class="file" id="fileRow" hidden><span id="fileName"></span><button type="button" id="clearFile" aria-label="Remove file">×</button></div>
+        </div>
+
+        <div id="pageBox" hidden>
+          <span class="label">Pages</span>
+          <div class="pages">
+            <input type="number" id="start" min="1" value="1" aria-label="Start page">
+            <input type="number" id="end" min="1" value="1" aria-label="End page">
+          </div>
+          <p class="hint">Up to 5 pages at a time. Each page is a separate OCR pass.</p>
+        </div>
+
+        <div>
+          <span class="label">Or try a sample</span>
+          <div class="samples">
+            <button type="button" class="sample" data-src="samples/english_support_policy.png"><img src="samples/english_support_policy.png" alt=""><span>English</span></button>
+            <button type="button" class="sample" data-src="samples/french_notice_technique.png"><img src="samples/french_notice_technique.png" alt=""><span>French</span></button>
+            <button type="button" class="sample" data-src="samples/arabic_lesson_page.png"><img src="samples/arabic_lesson_page.png" alt=""><span>Arabic</span></button>
+          </div>
+          <p class="hint">Run the Arabic page through both engines: Tesseract mangles it, the vision LLM does not.</p>
+        </div>
+
+        <div>
+          <button class="btn btn-primary" id="extractBtn" type="button" disabled>Extract text</button>
+          <div class="msg" id="msg"></div>
+        </div>
+      </aside>
+
+      <main class="card">
+        <div class="tabs" role="tablist">
+          <button type="button" class="tab" role="tab" id="tabText" aria-selected="true">1 · Extracted text</button>
+          <button type="button" class="tab" role="tab" id="tabSum" aria-selected="false" disabled>2 · Summaries</button>
+        </div>
+
+        <section id="panelText">
+          <div class="empty" id="empty"><div><b>Your text will appear here</b>Pick a sample or upload a document, then extract.</div></div>
+          <div id="result" hidden>
+            <div class="toolbar">
+              <span id="resultInfo"></span>
+              <div class="actions">
+                <button type="button" class="btn btn-light" id="toggleRaw">Show Markdown</button>
+                <button type="button" class="btn btn-light" id="copyBtn">Copy</button>
+                <a class="btn btn-light" id="downloadMd" download="extracted.md">Download .md</a>
+              </div>
+            </div>
+            <div class="md" id="rendered"></div>
+            <textarea class="raw" id="raw" hidden spellcheck="false" aria-label="Extracted Markdown"></textarea>
+          </div>
+        </section>
+
+        <section id="panelSum" hidden>
+          <p class="hint" style="margin:0 0 12px">Chapters are split on # and ## headings. Pick the ones to summarize.</p>
+          <ul class="chapters" id="chapters"></ul>
+          <button class="btn btn-primary" id="sumBtn" type="button" style="max-width:280px">Summarize</button>
+          <div id="summaries"></div>
+        </section>
+      </main>
+    </div>
+
+    <footer>
+      <span>Built by <a href="https://majd-aguir.vercel.app/">Majd Aguir</a> · Uploads are processed in memory and discarded</span>
+      <a href="https://github.com/Majd1029/OCR-Summarizer_Agents">View code on GitHub ↗</a>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"></script>
+  <script type="module">
+    import { Client, handle_file } from 'https://cdn.jsdelivr.net/npm/@gradio/client@2.7.1/dist/browser.js';
+
+    const $ = (id) => document.getElementById(id);
+    const MAX_BYTES = 20 * 1024 * 1024;
+    const HINTS = {
+      'Tesseract': 'Free and always on. Good on clean printed French and English; Arabic, handwriting, maths and complex tables come out unreliable.',
+      'Vision LLM': 'Far better on Arabic, handwriting, mathematical notation and tables. Needs your own Anthropic API key.',
+    };
+    let client = null, ready = false, busy = false, backend = 'Tesseract';
+    let doc = null, markdown = '', mdUrl = null, isPdf = false;
+
+    function setStatus(state, text) { $('status').dataset.state = state; $('status').querySelector('span').textContent = text; }
+    function showMsg(kind, text) { $('msg').className = 'msg show ' + kind; $('msg').textContent = text; }
+    function clearMsg() { $('msg').className = 'msg'; $('msg').textContent = ''; }
+    function errorText(err) {
+      const t = (err && (err.message || (err.data && err.data.message))) || String(err || '');
+      if (/quota/i.test(t)) return 'The free GPU time for this demo has run out for now. Extraction still works; try summarizing again later.';
+      return t || 'Something went wrong. Please try again.';
+    }
+    function apiKey() { return backend === 'Vision LLM' ? $('apiKey').value.trim() : ''; }
+    function update() {
+      const needKey = backend === 'Vision LLM' && !apiKey();
+      $('extractBtn').disabled = !ready || busy || !doc || needKey;
+      $('sumBtn').disabled = !ready || busy || needKey || !document.querySelector('.chapters input:checked');
+      $('extractBtn').textContent = needKey && doc ? 'Paste an API key first' : 'Extract text';
+    }
+
+    // ---------------------------------------------------------------- render
+    function renderMarkdown(el, text) {
+      el.innerHTML = DOMPurify.sanitize(marked.parse(text), { ADD_ATTR: ['align', 'dir'] });
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }],
+          throwOnError: false,
+        });
+      }
+    }
+    function chaptersOf(text) {
+      // Same split as summarizer.split_markdown_into_chapters: # and ## headings.
+      const parts = text.split(/^#{1,2} (.+)$/m);
+      if (parts.length < 2) return [{ title: 'Full document', body: text }];
+      const out = [];
+      for (let i = 1; i < parts.length; i += 2) out.push({ title: parts[i].trim(), body: (parts[i + 1] || '').trim() });
+      return out;
+    }
+
+    // ------------------------------------------------------------- engine
+    document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
+      backend = b.dataset.backend;
+      document.querySelectorAll('.seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      $('engineHint').textContent = HINTS[backend];
+      $('keyBox').hidden = backend !== 'Vision LLM';
+      update();
+    }));
+    $('engineHint').textContent = HINTS[backend];
+    $('apiKey').addEventListener('input', update);
+
+    // ----------------------------------------------------------- document
+    function setDoc(blob, name) {
+      const pdf = blob.type === 'application/pdf' || /\.pdf$/i.test(name);
+      if (!pdf && !/^image\//.test(blob.type)) { showMsg('error', 'Use a PDF, PNG, JPG or WebP file.'); return; }
+      if (blob.size > MAX_BYTES) { showMsg('error', 'That file is over 20 MB. Try a smaller one.'); return; }
+      clearMsg();
+      doc = { blob, name }; isPdf = pdf;
+      $('fileName').textContent = name;
+      $('fileRow').hidden = false;
+      $('pageBox').hidden = !pdf;
+      if (pdf) { $('start').value = 1; $('end').value = 1; }
+      update();
+    }
+    function clearDoc() {
+      doc = null; $('fileRow').hidden = true; $('pageBox').hidden = true;
+      document.querySelectorAll('.sample').forEach((x) => x.setAttribute('aria-pressed', 'false'));
+      update();
+    }
+    $('fileInput').addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      document.querySelectorAll('.sample').forEach((x) => x.setAttribute('aria-pressed', 'false'));
+      if (f) setDoc(f, f.name);
+      e.target.value = '';
+    });
+    $('clearFile').addEventListener('click', clearDoc);
+    const drop = $('drop');
+    drop.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('fileInput').click(); } });
+    ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, () => drop.classList.remove('over')));
+    drop.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const f = e.dataTransfer.files[0];
+      if (f) { document.querySelectorAll('.sample').forEach((x) => x.setAttribute('aria-pressed', 'false')); setDoc(f, f.name); }
+    });
+    document.querySelectorAll('.sample').forEach((b) => b.addEventListener('click', async () => {
+      try {
+        const blob = await (await fetch(b.dataset.src)).blob();
+        document.querySelectorAll('.sample').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        setDoc(blob, b.dataset.src.split('/').pop());
+      } catch (err) { showMsg('error', 'Could not load that sample.'); }
+    }));
+    $('start').addEventListener('change', () => {
+      const s = Math.max(1, Number($('start').value) || 1);
+      $('start').value = s;
+      if (Number($('end').value) < s) $('end').value = s;
+      if (Number($('end').value) > s + 4) $('end').value = s + 4;
+    });
+    $('end').addEventListener('change', () => {
+      const s = Number($('start').value) || 1;
+      $('end').value = Math.min(Math.max(Number($('end').value) || s, s), s + 4);
+    });
+
+    // ---------------------------------------------------------- connect
+    // Free Spaces sleep after a while without visitors. Client.connect wakes the
+    // Space, but gives up after about a minute, so keep retrying for ten minutes.
+    const started = Date.now();
+    async function connect() {
+      try {
+        client = await Client.connect(window.SPACE_ID, {
+          status_callback: (s) => {
+            if (s.status === 'sleeping') {
+              setStatus('waking', 'Waking up the server…');
+              showMsg('info', 'The server sleeps when nobody has used it for a while. Waking it up usually takes 1–3 minutes; this page will update by itself.');
+            } else if (s.status === 'building' || s.status === 'starting') {
+              setStatus('loading', 'Starting up…');
+            } else if (s.status === 'paused' || s.status === 'space_error') {
+              setStatus('error', 'Unavailable');
+              showMsg('error', s.message || 'The demo is unavailable right now.');
+            }
+          }
+        });
+        ready = true;
+        setStatus('ready', 'Ready');
+        if ($('msg').classList.contains('info')) clearMsg();
+      } catch (err) {
+        ready = false;
+        if (Date.now() - started < 10 * 60 * 1000) { setStatus('waking', 'Waking up the server…'); setTimeout(connect, 10000); }
+        else { setStatus('error', 'Offline'); showMsg('error', 'The server is not responding. Please try again later.'); }
+      }
+      update();
+    }
+
+    // ---------------------------------------------------------- extract
+    $('extractBtn').addEventListener('click', async () => {
+      if (!doc || !ready || busy) return;
+      busy = true; update(); clearMsg();
+      setStatus('busy', 'Extracting…');
+      selectTab('text');
+      $('result').hidden = true; $('empty').hidden = false;
+      const t0 = Date.now();
+      $('empty').innerHTML = '<div><div class="spinner"></div><b id="elapsed">Reading the document…</b>Usually a few seconds per page.</div>';
+      const tick = setInterval(() => { const el = $('elapsed'); if (el) el.textContent = 'Reading the document… ' + Math.round((Date.now() - t0) / 1000) + 's'; }, 500);
+      try {
+        const res = await client.predict('/extract', {
+          file: handle_file(new File([doc.blob], doc.name, { type: doc.blob.type })),
+          start: isPdf ? Number($('start').value) || 1 : 1,
+          end: isPdf ? Number($('end').value) || 1 : 1,
+          backend, api_key: apiKey(),
+        });
+        const [text, info] = res.data;
+        markdown = text || '';
+        showResult(info, (Date.now() - t0) / 1000);
+      } catch (err) {
+        $('empty').innerHTML = '<div><b>No text this time</b>Try again, or another engine.</div>';
+        showMsg('error', errorText(err));
+      } finally {
+        clearInterval(tick);
+        busy = false;
+        if (ready) setStatus('ready', 'Ready');
+        update();
+      }
+    });
+
+    function showResult(info, secs) {
+      $('empty').hidden = true; $('result').hidden = false;
+      renderMarkdown($('rendered'), markdown);
+      $('raw').value = markdown;
+      let where = 'Image';
+      if (info && info.type === 'pdf') {
+        where = info.start === info.end ? 'Page ' + info.start : 'Pages ' + info.start + '–' + info.end;
+        where += ' of ' + info.total_pages;
+        $('start').max = $('end').max = info.total_pages;
+      }
+      $('resultInfo').textContent = where + ' · ' + (info && info.backend || backend) + ' · ' + secs.toFixed(1) + 's';
+      if (mdUrl) URL.revokeObjectURL(mdUrl);
+      mdUrl = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown' }));
+      $('downloadMd').href = mdUrl;
+      $('downloadMd').download = 'Extracted_' + (doc ? doc.name.replace(/\.[^.]+$/, '') : 'document') + '.md';
+      buildChapters();
+      $('tabSum').disabled = !markdown.trim();
+    }
+
+    $('toggleRaw').addEventListener('click', () => {
+      const showRaw = $('raw').hidden;
+      if (!showRaw) { markdown = $('raw').value; renderMarkdown($('rendered'), markdown); buildChapters(); }
+      $('raw').hidden = !showRaw; $('rendered').hidden = showRaw;
+      $('toggleRaw').textContent = showRaw ? 'Show rendered' : 'Show Markdown';
+    });
+    $('copyBtn').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText($('raw').hidden ? markdown : $('raw').value); $('copyBtn').textContent = 'Copied'; }
+      catch (e) { $('copyBtn').textContent = 'Copy failed'; }
+      setTimeout(() => { $('copyBtn').textContent = 'Copy'; }, 1500);
+    });
+
+    // -------------------------------------------------------- summaries
+    function selectTab(which) {
+      const text = which === 'text';
+      $('tabText').setAttribute('aria-selected', String(text));
+      $('tabSum').setAttribute('aria-selected', String(!text));
+      $('panelText').hidden = !text; $('panelSum').hidden = text;
+    }
+    $('tabText').addEventListener('click', () => selectTab('text'));
+    $('tabSum').addEventListener('click', () => { if (!$('raw').hidden) { markdown = $('raw').value; buildChapters(); } selectTab('sum'); });
+
+    function buildChapters() {
+      const list = $('chapters');
+      list.innerHTML = '';
+      chaptersOf(markdown).forEach((c, i) => {
+        if (!c.body) return;
+        const li = document.createElement('li');
+        li.innerHTML = '<label><input type="checkbox"><span></span></label>';
+        li.querySelector('input').checked = i < 3;
+        li.querySelector('input').dataset.index = i;
+        li.querySelector('span').textContent = c.title;
+        li.querySelector('input').addEventListener('change', update);
+        list.appendChild(li);
+      });
+      update();
+    }
+
+    $('sumBtn').addEventListener('click', async () => {
+      if (!ready || busy) return;
+      const chapters = chaptersOf(markdown);
+      const picked = [...document.querySelectorAll('.chapters input:checked')].map((x) => chapters[Number(x.dataset.index)]);
+      if (!picked.length) return;
+      busy = true; update(); clearMsg();
+      const out = $('summaries');
+      out.innerHTML = '';
+      for (const [i, c] of picked.entries()) {
+        setStatus('busy', 'Summarizing ' + (i + 1) + '/' + picked.length + '…');
+        const sec = document.createElement('section');
+        sec.className = 'summary';
+        sec.innerHTML = '<header><h2></h2><a class="btn btn-light" hidden>Download</a></header><div class="md"><div class="spinner"></div></div>';
+        sec.querySelector('h2').textContent = c.title;
+        out.appendChild(sec);
+        try {
+          const res = await client.predict('/summarize', { text: c.body, backend, api_key: apiKey() });
+          const summary = res.data[0] || '';
+          renderMarkdown(sec.querySelector('.md'), summary);
+          const a = sec.querySelector('a');
+          a.href = URL.createObjectURL(new Blob([summary], { type: 'text/markdown' }));
+          a.download = c.title.replace(/[^\w؀-ۿ -]+/g, '').replace(/\s+/g, '_').slice(0, 60) + '_summary.md';
+          a.hidden = false;
+        } catch (err) {
+          sec.querySelector('.md').textContent = errorText(err);
+          sec.querySelector('.md').style.color = 'var(--bad)';
+          if (/quota|API key/i.test(errorText(err))) break;
+        }
+      }
+      busy = false;
+      if (ready) setStatus('ready', 'Ready');
+      update();
+    });
+
+    connect();
+  </script>
+</body>
+</html>

@@ -1,3 +1,15 @@
+---
+title: OCR Summarizer
+emoji: 📖
+colorFrom: yellow
+colorTo: red
+sdk: gradio
+sdk_version: 6.29.0
+app_file: app.py
+pinned: false
+short_description: Multilingual OCR to Markdown, then chapter summaries
+---
+
 # OCR-Summarizer-Agents
 
 **[Try the live demo](https://majd-ocr-summarizer.streamlit.app)** — free Tesseract path needs no key; three printed sample documents are bundled.
@@ -6,8 +18,15 @@ This project provides a modular OCR (Optical Character Recognition) and summariz
 
 ## Hosted demo
 
-`app.py` is a trimmed Streamlit build of this pipeline, deployed on Streamlit
-Community Cloud. Two OCR backends, chosen by what you are reading:
+A trimmed build of this pipeline runs as a static page on Vercel (`web/`)
+backed by a free Hugging Face ZeroGPU Space (`app.py`):
+
+```
+Vercel (web/index.html)  ──@gradio/client──▶  Hugging Face Space (app.py)
+   static page, free                            Tesseract + summarizer, free ZeroGPU
+```
+
+Two OCR backends, chosen by what you are reading:
 
 | Backend | Good at | Cost |
 |---|---|---|
@@ -17,13 +36,35 @@ Community Cloud. Two OCR backends, chosen by what you are reading:
 Tesseract is the default because it needs no key, and the app says plainly that
 the hard cases — scanned maths, handwriting — are where the vision LLM pulls ahead.
 That is what this project was built for; the free path is a floor, not the
-point. Three synthetic printed documents are bundled under `demo_samples/` so
+point. Three synthetic printed documents are bundled under `web/samples/` so
 you can try it without uploading anything.
 
 Arabic is configured in Tesseract but its output is unreliable even on clean printed pages. The bundled Arabic sample is kept deliberately: running it through both backends shows the gap directly, and that gap is the reason this project used a vision model in the first place.
 
-Summaries run on a small open model in-process, so the free path is
-end-to-end free. Uploads are processed in memory and discarded with the session.
+Summaries run on a small open model (Qwen2.5-0.5B-Instruct) inside the Space,
+on the ZeroGPU GPU, so the free path is end-to-end free. Uploads are processed
+in memory and discarded after each request. Up to 5 PDF pages are read per
+request.
+
+### Space API
+
+| Endpoint | Inputs | Returns |
+|---|---|---|
+| `/extract` | `file`, `start`, `end`, `backend`, `api_key` | Markdown, page info |
+| `/summarize` | `text`, `backend`, `api_key` | summary Markdown |
+
+`backend` is `Tesseract` or `Vision LLM`; the API key is only needed for the latter.
+
+### Deploying
+
+1. **Hugging Face Space:** create a new Space named `ocr-summarizer` → SDK
+   **Gradio** → *Blank* → hardware **ZeroGPU** (the free option), **Public**.
+2. **GitHub:** Settings → Secrets and variables → Actions → secret `HF_TOKEN`
+   (a write token) and variable `HF_SPACE` = `MA29/ocr-summarizer`. Then run the
+   **Sync to Hugging Face Space** workflow (Actions tab). It copies the app
+   files, `requirements.txt` and `packages.txt` (Tesseract) to the Space.
+3. **Vercel:** Add New → Project → import this repo → Root Directory `web`,
+   Framework **Other**, no build command.
 
 Dependencies for the hosted demo are in `requirements.txt`. The full local stack
 for `OCR_Extractor.py`, `chapter_summarizer.py` and the `EXP/` backends
