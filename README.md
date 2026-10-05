@@ -1,6 +1,6 @@
 # OCR-Summarizer-Agents
 
-**[Try the live demo](https://majd-ocr-summarizer.streamlit.app)** — free Tesseract path needs no key; three printed sample documents are bundled.
+**[Try the live demo](https://ocr-summarizeragents-web.vercel.app)** — runs in your browser; the free Tesseract path needs no key, and three printed sample documents are bundled.
 
 This project provides a modular OCR (Optical Character Recognition) and summarization pipeline supporting multiple OCR engines (Gemini, OpenAI, Tesseract, EasyOCR, PaddleOCR) and LLM-based summarization. It extracts text from scanned documents, images, and PDFs, preserves mathematical formulas and theorems, and can summarize Markdown chapters with high fidelity.
 
