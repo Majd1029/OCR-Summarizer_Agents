@@ -1,4 +1,6 @@
-"""Gradio app for the Hugging Face Space, also used by the Vercel page in web/.
+"""Gradio app running the pipeline server-side, for local or GPU use.
+
+The hosted demo (web/index.html) does the same steps entirely in the browser.
 
 API (call with @gradio/client or gradio_client):
     /extract   (file, start, end, backend, api_key) -> (markdown, info)
@@ -89,7 +91,6 @@ with gr.Blocks(title="OCR → Summarizer") as demo:
     gr.Markdown(
         "# OCR → Summarizer\n"
         "Multilingual OCR (Arabic / French / English) to Markdown, then chapter summaries. "
-        "The full demo page is on Vercel; this Space serves its API. "
         "[Source](https://github.com/Majd1029/OCR-Summarizer_Agents)"
     )
     with gr.Row():

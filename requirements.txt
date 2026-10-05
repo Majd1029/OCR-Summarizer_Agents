@@ -1,7 +1,6 @@
-# Installed by the Hugging Face Space (Gradio SDK, ZeroGPU hardware), next to
-# Gradio itself (sdk_version in README.md). Tesseract and its language packs
-# come from packages.txt. ZeroGPU runs Python 3.10 and provides its own CUDA
-# build of torch, so torch is left unpinned.
+# For app.py (the server-side pipeline; install gradio too). Tesseract and its
+# language packs are system packages, listed in packages.txt. The hosted demo
+# in web/ runs in the browser and needs none of this.
 
 pytesseract==0.3.13
 pymupdf==1.25.1

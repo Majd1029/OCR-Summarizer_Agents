@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>OCR → Summarizer — Majd Aguir</title>
-  <meta name="description" content="Multilingual OCR (Arabic, French, English) to Markdown, then chapter summaries. Free Tesseract path or a vision LLM with your own key.">
+  <meta name="description" content="Multilingual OCR (Arabic, French, English) to Markdown, then chapter summaries. Runs entirely in your browser; a vision LLM with your own key is optional.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -12,10 +12,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
-  <script>
-    // The Hugging Face Space that runs app.py, as "owner/name".
-    window.SPACE_ID = 'MA29/ocr-summarizer';
-  </script>
   <style>
     :root {
       --bg: #f5f5f7; --card: #ffffff; --card-2: #f2f2f4; --text: #1d1d1f; --muted: #6e6e73;
@@ -129,9 +125,9 @@
     <header>
       <div>
         <h1><span>OCR</span> → Summarizer</h1>
-        <p class="sub">Turn a scanned page or PDF (Arabic, French or English) into Markdown, then summarize it chapter by chapter.</p>
+        <p class="sub">Turn a scanned page or PDF (Arabic, French or English) into Markdown, then summarize it chapter by chapter. Everything runs in your browser: your files are never uploaded.</p>
       </div>
-      <div class="status" id="status" data-state="waking" role="status" aria-live="polite"><i></i><span>Connecting…</span></div>
+      <div class="status" id="status" data-state="ready" role="status" aria-live="polite"><i></i><span>Ready</span></div>
     </header>
 
     <div class="grid">
@@ -146,7 +142,7 @@
           <div id="keyBox" hidden style="margin-top:12px">
             <label class="label" for="apiKey">Anthropic API key</label>
             <input type="password" id="apiKey" autocomplete="off" placeholder="sk-ant-…">
-            <p class="hint">Sent only with your requests, never stored. Get one at console.anthropic.com.</p>
+            <p class="hint">Sent from your browser straight to Anthropic, never stored or sent anywhere else. Get one at console.anthropic.com.</p>
           </div>
         </div>
 
@@ -178,7 +174,7 @@
             <button type="button" class="sample" data-src="samples/french_notice_technique.png"><img src="samples/french_notice_technique.png" alt=""><span>French</span></button>
             <button type="button" class="sample" data-src="samples/arabic_lesson_page.png"><img src="samples/arabic_lesson_page.png" alt=""><span>Arabic</span></button>
           </div>
-          <p class="hint">Run the Arabic page through both engines: Tesseract mangles it, the vision LLM does not.</p>
+          <p class="hint">Try the Arabic page with both engines to compare them.</p>
         </div>
 
         <div>
@@ -211,6 +207,7 @@
 
         <section id="panelSum" hidden>
           <p class="hint" style="margin:0 0 12px">Chapters are split on # and ## headings. Pick the ones to summarize.</p>
+          <p class="hint" id="sumHint" style="margin:0 0 12px"></p>
           <ul class="chapters" id="chapters"></ul>
           <button class="btn btn-primary" id="sumBtn" type="button" style="max-width:280px">Summarize</button>
           <div id="summaries"></div>
@@ -219,7 +216,7 @@
     </div>
 
     <footer>
-      <span>Built by <a href="https://majd-aguir.vercel.app/">Majd Aguir</a> · Uploads are processed in memory and discarded</span>
+      <span>Built by <a href="https://majd-aguir.vercel.app/">Majd Aguir</a> · Your files stay on your device</span>
       <a href="https://github.com/Majd1029/OCR-Summarizer_Agents">View code on GitHub ↗</a>
     </footer>
   </div>
@@ -228,33 +225,74 @@
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/contrib/auto-render.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/tesseract.min.js"></script>
   <script type="module">
-    import { Client, handle_file } from 'https://cdn.jsdelivr.net/npm/@gradio/client@2.7.1/dist/browser.js';
+    // Everything runs in the visitor's browser: Tesseract.js (WASM) for OCR,
+    // pdf.js for PDFs, transformers.js for the free summarizer, and the Anthropic
+    // SDK, with the visitor's own key, for the Vision LLM path.
+    import * as pdfjs from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/legacy/build/pdf.min.mjs';
+    pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/legacy/build/pdf.worker.min.mjs';
+
+    const TESS_LANGS = 'ara+fra+eng';
+    const LLM_MODEL = 'claude-opus-5';
+    const LOCAL_MODEL = 'onnx-community/Qwen2.5-0.5B-Instruct';
+    const MAX_BYTES = 20 * 1024 * 1024;
+    const MAX_PAGES = 5;
+    const PDF_SCALE = 200 / 72;   // render PDFs at 200 dpi, as the Python backend did
+
+    // Same prompts as ocr_backends.py and summarizer.py.
+    const OCR_PROMPT = `You are an OCR and document layout engine for scanned educational
+content in Arabic, English and French.
+
+1. Detect the language(s) automatically.
+2. Extract text exactly as it appears. No translation, no correction.
+3. Preserve formatting, diacritics, punctuation, bullets, lists and structure.
+4. Output GitHub-flavored Markdown only.
+5. For RTL text use <div align="right">.
+6. Use borderless HTML <table> for multi-column layouts.
+7. Replace unreadable text with [Unreadable].
+8. Preserve maths as LaTeX using $...$ / $$...$$.
+9. Bold theorems, lemmas and proofs, e.g. **Theorem 1:**.
+10. Return the transcription only, with no preamble or commentary.`;
+    const SUMMARY_PROMPT = `You summarise academic and educational documents.
+
+Write a detailed, multi-paragraph summary of the chapter below, in the SAME
+language as the original. Explain key points, definitions and concepts.
+Reproduce every theorem and formula exactly, preserving LaTeX notation, and
+explain what each one means. Use paragraphs, no bullets, no headings, no page
+numbers. Return clean Markdown only.`;
 
     const $ = (id) => document.getElementById(id);
-    const MAX_BYTES = 20 * 1024 * 1024;
     const HINTS = {
-      'Tesseract': 'Free and always on. Good on clean printed French and English; Arabic, handwriting, maths and complex tables come out unreliable.',
+      'Tesseract': 'Free, runs in your browser. Good on clean printed French and English; Arabic, handwriting, maths and complex tables come out unreliable. The first run downloads the language data (a few MB).',
       'Vision LLM': 'Far better on Arabic, handwriting, mathematical notation and tables. Needs your own Anthropic API key.',
     };
-    let client = null, ready = false, busy = false, backend = 'Tesseract';
+    const SUM_HINTS = {
+      'Tesseract': 'Free summaries use a small open model (Qwen2.5-0.5B) running in your browser. The first run downloads it once (a few hundred MB), then it is cached. Faster in browsers with WebGPU.',
+      'Vision LLM': 'Summaries use the vision LLM with your API key.',
+    };
+    let busy = false, backend = 'Tesseract';
     let doc = null, markdown = '', mdUrl = null, isPdf = false;
+    let tessWorker = null, summarizer = null, anthropic = null, anthropicKey = null;
 
     function setStatus(state, text) { $('status').dataset.state = state; $('status').querySelector('span').textContent = text; }
     function showMsg(kind, text) { $('msg').className = 'msg show ' + kind; $('msg').textContent = text; }
     function clearMsg() { $('msg').className = 'msg'; $('msg').textContent = ''; }
     function errorText(err) {
-      const t = (err && (err.message || (err.data && err.data.message))) || String(err || '');
-      if (/quota/i.test(t)) return 'The free GPU time for this demo has run out for now. Extraction still works; try summarizing again later.';
+      const status = err && err.status;
+      if (status === 401) return 'The API key was rejected. Check it and try again.';
+      if (status === 429) return 'The API rate limit was hit. Wait a moment and try again.';
+      const t = (err && (err.message || String(err))) || '';
       return t || 'Something went wrong. Please try again.';
     }
     function apiKey() { return backend === 'Vision LLM' ? $('apiKey').value.trim() : ''; }
     function update() {
       const needKey = backend === 'Vision LLM' && !apiKey();
-      $('extractBtn').disabled = !ready || busy || !doc || needKey;
-      $('sumBtn').disabled = !ready || busy || needKey || !document.querySelector('.chapters input:checked');
+      $('extractBtn').disabled = busy || !doc || needKey;
+      $('sumBtn').disabled = busy || needKey || !document.querySelector('.chapters input:checked');
       $('extractBtn').textContent = needKey && doc ? 'Paste an API key first' : 'Extract text';
     }
+    function progressNote(text) { const el = $('elapsed'); if (el) el.textContent = text; }
 
     // ---------------------------------------------------------------- render
     function renderMarkdown(el, text) {
@@ -275,16 +313,122 @@
       return out;
     }
 
+    // --------------------------------------------------------------- engines
+    async function getTesseract() {
+      if (!tessWorker) {
+        tessWorker = Tesseract.createWorker(TESS_LANGS, 1, {
+          logger: (m) => {
+            if (m.status && typeof m.progress === 'number' && /load|init/i.test(m.status)) {
+              progressNote('Loading the OCR engine… ' + Math.round(m.progress * 100) + '%');
+            }
+          },
+        }).catch((e) => { tessWorker = null; throw e; });
+      }
+      return tessWorker;
+    }
+
+    async function getAnthropic(key) {
+      if (!anthropic || anthropicKey !== key) {
+        const { default: Anthropic } = await import('https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm');
+        // The key is the visitor's own, typed into their own browser, so calling
+        // the API directly from the page is the intended use here.
+        anthropic = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true });
+        anthropicKey = key;
+      }
+      return anthropic;
+    }
+
+    // Same request shape as ocr_backends.py / summarizer.py: adaptive thinking,
+    // and server-side fallbacks so a refusal on one page is retried elsewhere.
+    async function askLLM(content, { system, maxTokens, what }) {
+      const client = await getAnthropic(apiKey());
+      const response = await client.beta.messages.create({
+        model: LLM_MODEL,
+        max_tokens: maxTokens,
+        betas: ['server-side-fallback-2026-07-01'],
+        fallbacks: 'default',
+        thinking: { type: 'adaptive' },
+        ...(system ? { system } : {}),
+        messages: [{ role: 'user', content }],
+      });
+      // A refusal returns HTTP 200 with stop_reason "refusal", so check it first.
+      if (response.stop_reason === 'refusal') {
+        const reason = (response.stop_details && response.stop_details.explanation) || 'declined by a safety classifier';
+        return `*[The model declined this ${what}: ${reason}]*`;
+      }
+      return response.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+    }
+
+    async function ocrPage(canvas) {
+      if (backend === 'Vision LLM') {
+        const data = canvas.toDataURL('image/png').split(',')[1];
+        const text = await askLLM([
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data } },
+          { type: 'text', text: OCR_PROMPT },
+        ], { maxTokens: 8000, what: 'page' });
+        return text || '*[No text detected]*';
+      }
+      const worker = await getTesseract();
+      const { data } = await worker.recognize(canvas);
+      return (data.text || '').trim() || '*[No text detected]*';
+    }
+
+    async function getSummarizer() {
+      if (!summarizer) {
+        summarizer = (async () => {
+          const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js');
+          const gpu = 'gpu' in navigator && await navigator.gpu.requestAdapter().catch(() => null);
+          return pipeline('text-generation', LOCAL_MODEL, {
+            device: gpu ? 'webgpu' : 'wasm',
+            dtype: gpu ? 'q4f16' : 'q4',
+            progress_callback: (p) => {
+              if (p.status === 'progress_total' && p.total) {
+                setStatus('loading', 'Downloading summarizer ' + Math.round(p.progress) + '%');
+                const el = document.querySelector('.summary .loading');
+                if (el) el.textContent = 'Downloading the summarizer model (once): ' +
+                  (p.loaded / 1048576).toFixed(0) + ' / ' + (p.total / 1048576).toFixed(0) + ' MB';
+              }
+            },
+          });
+        })().catch((e) => { summarizer = null; throw e; });
+      }
+      return summarizer;
+    }
+
+    async function summarize(body, onText) {
+      if (backend === 'Vision LLM') {
+        return askLLM(body, { system: SUMMARY_PROMPT, maxTokens: 4000, what: 'chapter' });
+      }
+      const { TextStreamer } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.0/dist/transformers.min.js');
+      const generator = await getSummarizer();
+      let text = '';
+      const out = await generator([
+        { role: 'system', content: SUMMARY_PROMPT },
+        { role: 'user', content: body.slice(0, 6000) },
+      ], {
+        max_new_tokens: 400,
+        do_sample: false,
+        streamer: new TextStreamer(generator.tokenizer, {
+          skip_prompt: true, skip_special_tokens: true,
+          callback_function: (piece) => { text += piece; onText(text); },
+        }),
+      });
+      const last = out[0].generated_text.at(-1);
+      return ((last && last.content) || text).trim();
+    }
+
     // ------------------------------------------------------------- engine
-    document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
-      backend = b.dataset.backend;
-      document.querySelectorAll('.seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    function setBackend(name) {
+      backend = name;
+      document.querySelectorAll('.seg button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.backend === name)));
       $('engineHint').textContent = HINTS[backend];
+      $('sumHint').textContent = SUM_HINTS[backend];
       $('keyBox').hidden = backend !== 'Vision LLM';
       update();
-    }));
-    $('engineHint').textContent = HINTS[backend];
+    }
+    document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => setBackend(b.dataset.backend)));
     $('apiKey').addEventListener('input', update);
+    setBackend('Tesseract');
 
     // ----------------------------------------------------------- document
     function setDoc(blob, name) {
@@ -296,7 +440,7 @@
       $('fileName').textContent = name;
       $('fileRow').hidden = false;
       $('pageBox').hidden = !pdf;
-      if (pdf) { $('start').value = 1; $('end').value = 1; }
+      if (pdf) { $('start').value = 1; $('end').value = 1; $('start').removeAttribute('max'); $('end').removeAttribute('max'); }
       update();
     }
     function clearDoc() {
@@ -331,70 +475,77 @@
       const s = Math.max(1, Number($('start').value) || 1);
       $('start').value = s;
       if (Number($('end').value) < s) $('end').value = s;
-      if (Number($('end').value) > s + 4) $('end').value = s + 4;
+      if (Number($('end').value) > s + MAX_PAGES - 1) $('end').value = s + MAX_PAGES - 1;
     });
     $('end').addEventListener('change', () => {
       const s = Number($('start').value) || 1;
-      $('end').value = Math.min(Math.max(Number($('end').value) || s, s), s + 4);
+      $('end').value = Math.min(Math.max(Number($('end').value) || s, s), s + MAX_PAGES - 1);
     });
 
-    // ---------------------------------------------------------- connect
-    // Free Spaces sleep after a while without visitors. Client.connect wakes the
-    // Space, but gives up after about a minute, so keep retrying for ten minutes.
-    const started = Date.now();
-    async function connect() {
-      try {
-        client = await Client.connect(window.SPACE_ID, {
-          status_callback: (s) => {
-            if (s.status === 'sleeping') {
-              setStatus('waking', 'Waking up the server…');
-              showMsg('info', 'The server sleeps when nobody has used it for a while. Waking it up usually takes 1–3 minutes; this page will update by itself.');
-            } else if (s.status === 'building' || s.status === 'starting') {
-              setStatus('loading', 'Starting up…');
-            } else if (s.status === 'paused' || s.status === 'space_error') {
-              setStatus('error', 'Unavailable');
-              showMsg('error', s.message || 'The demo is unavailable right now.');
-            }
-          }
-        });
-        ready = true;
-        setStatus('ready', 'Ready');
-        if ($('msg').classList.contains('info')) clearMsg();
-      } catch (err) {
-        ready = false;
-        if (Date.now() - started < 10 * 60 * 1000) { setStatus('waking', 'Waking up the server…'); setTimeout(connect, 10000); }
-        else { setStatus('error', 'Offline'); showMsg('error', 'The server is not responding. Please try again later.'); }
-      }
-      update();
+    // ----------------------------------------------------- page rendering
+    async function imageToCanvas(blob) {
+      const bitmap = await createImageBitmap(blob);
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width; canvas.height = bitmap.height;
+      canvas.getContext('2d').drawImage(bitmap, 0, 0);
+      bitmap.close();
+      return canvas;
+    }
+    async function pdfPages(blob, start, end) {
+      const task = pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) });
+      const pdf = await task.promise;
+      const total = pdf.numPages;
+      start = Math.max(1, Math.min(start, total));
+      end = Math.max(start, Math.min(end, total, start + MAX_PAGES - 1));
+      return { task, pdf, total, start, end };
+    }
+    async function renderPdfPage(pdf, n) {
+      const page = await pdf.getPage(n);
+      const viewport = page.getViewport({ scale: PDF_SCALE });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvas, viewport }).promise;
+      page.cleanup();
+      return canvas;
     }
 
     // ---------------------------------------------------------- extract
     $('extractBtn').addEventListener('click', async () => {
-      if (!doc || !ready || busy) return;
+      if (!doc || busy) return;
       busy = true; update(); clearMsg();
       setStatus('busy', 'Extracting…');
       selectTab('text');
       $('result').hidden = true; $('empty').hidden = false;
       const t0 = Date.now();
-      $('empty').innerHTML = '<div><div class="spinner"></div><b id="elapsed">Reading the document…</b>Usually a few seconds per page.</div>';
-      const tick = setInterval(() => { const el = $('elapsed'); if (el) el.textContent = 'Reading the document… ' + Math.round((Date.now() - t0) / 1000) + 's'; }, 500);
+      $('empty').innerHTML = '<div><div class="spinner"></div><b>Reading the document…</b><span id="elapsed">Starting…</span></div>';
       try {
-        const res = await client.predict('/extract', {
-          file: handle_file(new File([doc.blob], doc.name, { type: doc.blob.type })),
-          start: isPdf ? Number($('start').value) || 1 : 1,
-          end: isPdf ? Number($('end').value) || 1 : 1,
-          backend, api_key: apiKey(),
-        });
-        const [text, info] = res.data;
-        markdown = text || '';
+        const chunks = [];
+        let info;
+        if (isPdf) {
+          const r = await pdfPages(doc.blob, Number($('start').value) || 1, Number($('end').value) || 1);
+          info = { type: 'pdf', total_pages: r.total, start: r.start, end: r.end };
+          for (let n = r.start; n <= r.end; n++) {
+            progressNote('Page ' + n + ' of ' + r.start + '–' + r.end + '…');
+            setStatus('busy', 'Reading page ' + n + '…');
+            const text = await ocrPage(await renderPdfPage(r.pdf, n));
+            chunks.push((r.end > r.start ? '## Page ' + n + '\n\n' : '') + text);
+          }
+          r.task.destroy();
+        } else {
+          info = { type: 'image', total_pages: 1, start: 1, end: 1 };
+          progressNote(backend === 'Vision LLM' ? 'Waiting for the vision LLM…' : 'Running OCR…');
+          chunks.push(await ocrPage(await imageToCanvas(doc.blob)));
+        }
+        markdown = chunks.join('\n\n');
         showResult(info, (Date.now() - t0) / 1000);
       } catch (err) {
         $('empty').innerHTML = '<div><b>No text this time</b>Try again, or another engine.</div>';
         showMsg('error', errorText(err));
       } finally {
-        clearInterval(tick);
         busy = false;
-        if (ready) setStatus('ready', 'Ready');
+        setStatus('ready', 'Ready');
         update();
       }
     });
@@ -404,12 +555,12 @@
       renderMarkdown($('rendered'), markdown);
       $('raw').value = markdown;
       let where = 'Image';
-      if (info && info.type === 'pdf') {
+      if (info.type === 'pdf') {
         where = info.start === info.end ? 'Page ' + info.start : 'Pages ' + info.start + '–' + info.end;
         where += ' of ' + info.total_pages;
         $('start').max = $('end').max = info.total_pages;
       }
-      $('resultInfo').textContent = where + ' · ' + (info && info.backend || backend) + ' · ' + secs.toFixed(1) + 's';
+      $('resultInfo').textContent = where + ' · ' + backend + ' · ' + secs.toFixed(1) + 's';
       if (mdUrl) URL.revokeObjectURL(mdUrl);
       mdUrl = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown' }));
       $('downloadMd').href = mdUrl;
@@ -457,7 +608,7 @@
     }
 
     $('sumBtn').addEventListener('click', async () => {
-      if (!ready || busy) return;
+      if (busy) return;
       const chapters = chaptersOf(markdown);
       const picked = [...document.querySelectorAll('.chapters input:checked')].map((x) => chapters[Number(x.dataset.index)]);
       if (!picked.length) return;
@@ -468,29 +619,27 @@
         setStatus('busy', 'Summarizing ' + (i + 1) + '/' + picked.length + '…');
         const sec = document.createElement('section');
         sec.className = 'summary';
-        sec.innerHTML = '<header><h2></h2><a class="btn btn-light" hidden>Download</a></header><div class="md"><div class="spinner"></div></div>';
+        sec.innerHTML = '<header><h2></h2><a class="btn btn-light" hidden>Download</a></header><div class="md"><div class="spinner"></div><p class="hint loading">Working…</p></div>';
         sec.querySelector('h2').textContent = c.title;
         out.appendChild(sec);
+        const md = sec.querySelector('.md');
         try {
-          const res = await client.predict('/summarize', { text: c.body, backend, api_key: apiKey() });
-          const summary = res.data[0] || '';
-          renderMarkdown(sec.querySelector('.md'), summary);
+          const summary = (await summarize(c.body, (partial) => { md.textContent = partial; })) || '*The model returned an empty summary. Try again, or use the vision LLM.*';
+          renderMarkdown(md, summary);
           const a = sec.querySelector('a');
           a.href = URL.createObjectURL(new Blob([summary], { type: 'text/markdown' }));
           a.download = c.title.replace(/[^\w؀-ۿ -]+/g, '').replace(/\s+/g, '_').slice(0, 60) + '_summary.md';
           a.hidden = false;
         } catch (err) {
-          sec.querySelector('.md').textContent = errorText(err);
-          sec.querySelector('.md').style.color = 'var(--bad)';
-          if (/quota|API key/i.test(errorText(err))) break;
+          md.textContent = errorText(err);
+          md.style.color = 'var(--bad)';
+          break;
         }
       }
       busy = false;
-      if (ready) setStatus('ready', 'Ready');
+      setStatus('ready', 'Ready');
       update();
     });
-
-    connect();
   </script>
 </body>
 </html>
